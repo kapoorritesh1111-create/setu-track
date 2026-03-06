@@ -72,4 +72,23 @@ export default function ExportReceiptDrawer({ open, onClose, receipt }: Props) {
   async function togglePaid(nextPaid: boolean) {
     if (!r?.project_id || !r?.project_export_id) return;
 
-    const note = nextPaid ? window.prompt("Paid
+    const note = nextPaid ? window.prompt("Paid note (optional)") : null;
+
+  setBusy(true);
+
+  try {
+    const res = await apiJson("/api/project-exports/mark-paid", {
+      method: "POST",
+      body: JSON.stringify({
+        project_id: r.project_id,
+        export_id: r.project_export_id,
+        paid: nextPaid,
+        note,
+      }),
+    });
+
+    setPaid(res);
+  } finally {
+    setBusy(false);
+  }
+}
