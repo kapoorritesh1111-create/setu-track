@@ -1,4 +1,3 @@
-// src/components/ui/DataTable.tsx
 "use client";
 
 import React, { useMemo, useState } from "react";
@@ -31,6 +30,22 @@ export function Tag({
   return <span className={cls}>{children}</span>;
 }
 
+/**
+ * Backward-compatible ActionItem type used by older pages:
+ * actions={(row): ActionItem<Row>[] => [{ label, onClick, disabled }]}
+ */
+export type ActionItem<Row = any> = {
+  label: React.ReactNode;
+  onClick?: (row: Row) => void;
+  href?: string | ((row: Row) => string);
+  disabled?: boolean;
+  danger?: boolean;
+};
+
+/**
+ * Also export a value/component named ActionItem for compatibility
+ * with non-type imports.
+ */
 export function ActionItem({
   children,
   onClick,
@@ -98,7 +113,7 @@ type Props<Row> = {
   loading?: boolean;
   emptyTitle?: string;
   emptySubtitle?: string;
-  actions?: (row: Row) => React.ReactNode[] | React.ReactNode;
+  actions?: (row: Row) => Array<ActionItem<Row> | React.ReactNode> | React.ReactNode;
 };
 
 export default function DataTable<Row>({
@@ -178,6 +193,12 @@ export default function DataTable<Row>({
     if (width == null) return undefined;
     const value = typeof width === "number" ? `${width}px` : width;
     return { width: value };
+  }
+
+  function isActionItemObject<RowT>(
+    value: ActionItem<RowT> | React.ReactNode
+  ): value is ActionItem<RowT> {
+    return !!value && typeof value === "object" && "label" in (value as any);
   }
 
   if (loading) {
@@ -266,11 +287,11 @@ export default function DataTable<Row>({
             {sortedRows.map((row, idx) => {
               const id = keyFor(row, idx);
               const selected = !!selectedRowId && selectedRowId === id;
-              const rowActions = actions ? actions(row) : null;
-              const rowActionsArray = Array.isArray(rowActions)
-                ? rowActions
-                : rowActions
-                ? [rowActions]
+              const rawActions = actions ? actions(row) : null;
+              const rowActionsArray = Array.isArray(rawActions)
+                ? rawActions
+                : rawActions
+                ? [rawActions]
                 : [];
 
               return (
@@ -287,12 +308,30 @@ export default function DataTable<Row>({
                       </td>
                     );
                   })}
+
                   {hasActions ? (
                     <td style={{ whiteSpace: "nowrap" }}>
                       <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
-                        {rowActionsArray.map((node, i) => (
-                          <React.Fragment key={i}>{node}</React.Fragment>
-                        ))}
+                        {rowActionsArray.map((node, i) => {
+                          if (isActionItemObject<Row>(node)) {
+                            const href =
+                              typeof node.href === "function" ? node.href(row) : node.href;
+
+                            return (
+                              <ActionItem
+                                key={i}
+                                href={href}
+                                disabled={node.disabled}
+                                danger={node.danger}
+                                onClick={node.onClick ? () => node.onClick?.(row) : undefined}
+                              >
+                                {node.label}
+                              </ActionItem>
+                            );
+                          }
+
+                          return <React.Fragment key={i}>{node}</React.Fragment>;
+                        })}
                       </div>
                     </td>
                   ) : null}
