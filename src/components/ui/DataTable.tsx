@@ -13,12 +13,12 @@ export function Tag({
   tone = "default",
 }: {
   children: React.ReactNode;
-  tone?: "default" | "success" | "warning" | "danger" | "info" | "muted";
+  tone?: "default" | "success" | "warn" | "warning" | "danger" | "info" | "muted";
 }) {
   const cls =
     tone === "success"
       ? "pill ok"
-      : tone === "warning"
+      : tone === "warn" || tone === "warning"
       ? "pill warn"
       : tone === "danger"
       ? "pill danger"
@@ -95,8 +95,6 @@ type Props<Row> = {
   onRowClick?: (row: Row) => void;
   toolbarRight?: React.ReactNode;
   compact?: boolean;
-
-  // Backward-compat props used by older pages
   loading?: boolean;
   emptyTitle?: string;
   emptySubtitle?: string;
