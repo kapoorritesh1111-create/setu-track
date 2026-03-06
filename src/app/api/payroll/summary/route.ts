@@ -1,51 +1,94 @@
+// src/app/api/payroll/summary/route.ts
 import { NextResponse } from "next/server";
-import { supabaseService } from "../../../../lib/supabaseServer";
 import { requireManagerOrAdmin } from "../../../../lib/api/gates";
 
-/**
- * GET /api/payroll/summary
- * Returns per-project payroll summaries for the current org.
- *
- * NOTE:
- * - This is a read endpoint used by /reports/payroll.
- * - Export generation remains in /api/payroll/export (which requires period params).
- */
+type ProjectExportRow = {
+  id: string;
+  created_at: string;
+  period_start: string | null;
+  period_end: string | null;
+  total_amount: number | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  paid_note: string | null;
+};
+
+type ProjectRow = {
+  id: string;
+  name: string | null;
+  updated_at: string | null;
+  project_exports?: ProjectExportRow[] | null;
+};
+
 export async function GET(req: Request) {
-  const supa = supabaseService();
-  const auth = await requireManagerOrAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  try {
+    const gate = await requireManagerOrAdmin(req);
+    if (!gate.ok) {
+      return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
+    }
 
-  // Per-project totals for approved entries (not locked period based).
-  // If you later want "by pay period", create a separate endpoint.
-  const { data, error } = await supa
-    .from("projects")
-    .select(
-      "id,name,updated_at, project_exports:project_exports(id,created_at,period_start,period_end, total_amount, paid_at, paid_by, paid_note)"
-    )
-    .eq("org_id", auth.org_id)
-    .order("updated_at", { ascending: false });
+    const { supa, profile } = gate;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    const { data, error } = await supa
+      .from("projects")
+      .select(
+        "id,name,updated_at, project_exports:project_exports(id,created_at,period_start,period_end,total_amount,paid_at,paid_by,paid_note)"
+      )
+      .eq("org_id", profile.org_id)
+      .order("updated_at", { ascending: false });
 
-  // Normalize: most recent export per project (if any)
-  const rows = (data || []).map((p: any) => {
-    const exports = (p.project_exports || []).sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
+
+    const rows = ((data || []) as ProjectRow[]).map((project) => {
+      const exports = Array.isArray(project.project_exports) ? project.project_exports : [];
+      const latest = exports
+        .slice()
+        .sort((a, b) => {
+          const ad = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bd = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bd - ad;
+        })[0];
+
+      return {
+        id: project.id,
+        project_id: project.id,
+        project_name: project.name || "Untitled Project",
+        period_start: latest?.period_start || "",
+        period_end: latest?.period_end || "",
+        total_hours: 0,
+        total_amount: Number(latest?.total_amount || 0),
+        receipts: exports.map((ex) => ({
+          id: ex.id,
+          org_id: profile.org_id,
+          created_at: ex.created_at,
+          created_by: ex.paid_by,
+          actor_name: null,
+          type: "project_export",
+          label:
+            ex.period_start && ex.period_end
+              ? `Project Export • ${ex.period_start} → ${ex.period_end}`
+              : "Project Export",
+          project_id: project.id,
+          payroll_run_id: null,
+          project_export_id: ex.id,
+          payload_hash: null,
+          diff_status: "unknown" as const,
+          meta: {
+            paid_at: ex.paid_at,
+            paid_by: ex.paid_by,
+            paid_note: ex.paid_note,
+          },
+        })),
+      };
+    });
+
+    return NextResponse.json({ ok: true, rows }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Server error" },
+      { status: 500 }
     );
-    const latest = exports[0] || null;
-    return {
-      project_id: p.id,
-      project_name: p.name,
-      latest_export_id: latest?.id || null,
-      latest_period_start: latest?.period_start || null,
-      latest_period_end: latest?.period_end || null,
-      latest_total_amount: latest?.total_amount || 0,
-      paid_at: latest?.paid_at || null,
-      paid_by: latest?.paid_by || null,
-      paid_note: latest?.paid_note || null,
-      updated_at: p.updated_at,
-    };
-  });
-
-  return NextResponse.json({ rows });
+  }
 }
