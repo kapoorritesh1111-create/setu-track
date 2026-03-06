@@ -1,0 +1,30 @@
+-- Indexes
+begin;
+
+CREATE UNIQUE INDEX IF NOT EXISTS orgs_pkey ON public.orgs USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_profiles_manager_id ON public.profiles USING btree (manager_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_onboarding_completed_at ON public.profiles USING btree (onboarding_completed_at);
+CREATE INDEX IF NOT EXISTS idx_profiles_org_role ON public.profiles USING btree (org_id, role);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_pkey ON public.profiles USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_project_members_org_id ON public.project_members USING btree (org_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_org_project ON public.project_members USING btree (org_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_profile ON public.project_members USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_profile_id ON public.project_members USING btree (profile_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_project_active ON public.project_members USING btree (project_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON public.project_members USING btree (project_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON public.project_members USING btree (user_id);
+CREATE INDEX IF NOT EXISTS project_members_org_id_idx ON public.project_members USING btree (org_id);
+CREATE UNIQUE INDEX IF NOT EXISTS project_members_org_project_profile_uniq ON public.project_members USING btree (org_id, project_id, profile_id);
+CREATE UNIQUE INDEX IF NOT EXISTS project_members_pkey ON public.project_members USING btree (project_id, user_id);
+CREATE INDEX IF NOT EXISTS project_members_user_id_idx ON public.project_members USING btree (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_members_active ON public.project_members USING btree (project_id, profile_id) WHERE (is_active = true);
+CREATE INDEX IF NOT EXISTS idx_projects_org ON public.projects USING btree (org_id);
+CREATE INDEX IF NOT EXISTS projects_org_id_idx ON public.projects USING btree (org_id);
+CREATE INDEX IF NOT EXISTS projects_parent_id_idx ON public.projects USING btree (parent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS projects_pkey ON public.projects USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_org_date ON public.time_entries USING btree (org_id, entry_date);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_date ON public.time_entries USING btree (user_id, entry_date);
+CREATE UNIQUE INDEX IF NOT EXISTS te_unique_user_date_project ON public.time_entries USING btree (user_id, entry_date, project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS time_entries_pkey ON public.time_entries USING btree (id);
+create index if not exists audit_log_org_created_at_idx on public.audit_log(org_id, created_at desc);
+commit;
