@@ -24,8 +24,6 @@ export function Tag({
       ? "pill danger"
       : tone === "info"
       ? "pill info"
-      : tone === "muted"
-      ? "pill"
       : "pill";
 
   return <span className={cls}>{children}</span>;
@@ -94,6 +92,7 @@ export type ColumnDef<Row> = {
   headerClassName?: string;
   sortValue?: (row: Row) => string | number | null | undefined;
   width?: number | string;
+  align?: "left" | "center" | "right";
 };
 
 type Props<Row> = {
@@ -189,6 +188,21 @@ export default function DataTable<Row>({
     return { width: value };
   }
 
+  function alignStyle(align?: "left" | "center" | "right"): React.CSSProperties | undefined {
+    if (!align) return undefined;
+    return { textAlign: align };
+  }
+
+  function mergedStyle(
+    width?: number | string,
+    align?: "left" | "center" | "right"
+  ): React.CSSProperties | undefined {
+    return {
+      ...(widthStyle(width) || {}),
+      ...(alignStyle(align) || {}),
+    };
+  }
+
   function isActionItemObject<RowT>(
     value: ActionItem<RowT> | React.ReactNode
   ): value is ActionItem<RowT> {
@@ -252,9 +266,19 @@ export default function DataTable<Row>({
                     onClick={sortable ? () => toggleSort(c._id) : undefined}
                     role={sortable ? "button" : undefined}
                     tabIndex={sortable ? 0 : undefined}
-                    style={widthStyle(c.width)}
+                    style={mergedStyle(c.width, c.align)}
                   >
-                    <div className="thInner">
+                    <div
+                      className="thInner"
+                      style={{
+                        justifyContent:
+                          c.align === "right"
+                            ? "flex-end"
+                            : c.align === "center"
+                            ? "center"
+                            : "flex-start",
+                      }}
+                    >
                       <span>{c.header}</span>
                       {sortable ? (
                         <span className="sortIcon">
@@ -297,7 +321,7 @@ export default function DataTable<Row>({
                   {normalizedColumns.map((c) => {
                     const renderer = c.cell || c.render;
                     return (
-                      <td key={c._id} className={cn(c.className)} style={widthStyle(c.width)}>
+                      <td key={c._id} className={cn(c.className)} style={mergedStyle(c.width, c.align)}>
                         {renderer ? renderer(row) : null}
                       </td>
                     );
