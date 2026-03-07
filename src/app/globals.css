@@ -379,3 +379,229 @@ p { margin: 0; }
   .setuLoginPanelWrap { padding: 20px; }
   .setuLoginFeatureGrid, .setuCompareGrid, .setuMetaGrid3 { grid-template-columns: 1fr; }
 }
+
+/* ---------- Stabilization pass: native controls ---------- */
+button:not(.btn):not(.iconBtn):not(.mwProfileBtn):not(.mwSideItem):not(.mwMenuItem):not(.mwHamburger):not(.mwSidebarBrandBtn):not(.mwBrandButton):not(.mwDrawerTab) {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--setu-border);
+  background: var(--setu-surface);
+  color: var(--setu-text);
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(15,26,46,0.04);
+}
+button:not(.btn):not(.iconBtn):not(.mwProfileBtn):not(.mwSideItem):not(.mwMenuItem):not(.mwHamburger):not(.mwSidebarBrandBtn):not(.mwBrandButton):not(.mwDrawerTab):hover {
+  background: rgba(36,59,107,0.04);
+  border-color: rgba(36,59,107,0.18);
+}
+select:not(.input), input:not(.input):not([type="checkbox"]):not([type="radio"]), textarea:not(.input) {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--setu-border);
+  background: #fff;
+  color: var(--setu-text);
+  padding: 0 12px;
+}
+
+/* ---------- Stabilization pass: shell + drawer ---------- */
+.mwDesktopHidden { display: none; }
+@media (max-width: 920px) { .mwDesktopHidden { display: inline-flex; } }
+.mwSidebarLogo {
+  width: 172px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.mwBrandLogo {
+  width: 164px;
+  height: auto;
+  object-fit: contain;
+}
+.mwPanelOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(15,26,46,0.5);
+  backdrop-filter: blur(2px);
+}
+.mwPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  background: var(--setu-bg);
+  box-shadow: -28px 0 56px rgba(15,26,46,0.2);
+  display: grid;
+  grid-template-rows: auto auto minmax(0,1fr) auto;
+}
+.mwPanelHeader {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--setu-border);
+  background: rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.mwPanelTitle { font-size: 22px; font-weight: 900; color: var(--setu-indigo-900); }
+.mwPanelSubtitle { margin-top: 4px; color: var(--setu-muted); font-size: 13px; line-height: 1.5; }
+.mwDrawerTabs {
+  padding: 12px 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: rgba(255,255,255,0.82);
+}
+.mwDrawerTab {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--setu-border);
+  background: rgba(36,59,107,0.04);
+  color: var(--setu-indigo-700);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mwDrawerTabActive {
+  background: rgba(244,122,31,0.12);
+  border-color: rgba(244,122,31,0.2);
+  color: #9a4d0f;
+}
+.mwDrawerTabCount {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(36,59,107,0.09);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.mwPanelBody {
+  padding: 18px 20px 28px;
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+}
+.mwPanelFooter {
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--setu-border);
+  background: rgba(255,255,255,0.92);
+}
+
+/* ---------- Stabilization pass: timesheet ---------- */
+.tsHeaderRight, .tsWeekNav, .tsActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tsSummary {
+  margin-bottom: 14px;
+}
+.tsSummaryRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tsSummaryTitle {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--setu-muted);
+}
+.tsSummaryValue {
+  margin-top: 8px;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 950;
+  letter-spacing: -.04em;
+  color: var(--setu-indigo-900);
+}
+.tsSummaryHint { max-width: 420px; }
+.tsDays {
+  display: grid;
+  gap: 16px;
+}
+.tsDayCard {
+  display: grid;
+  gap: 14px;
+}
+.tsDayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tsDayTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--setu-indigo-900);
+}
+.tsDayTotal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(36,59,107,0.06);
+  color: var(--setu-indigo-700);
+  font-weight: 800;
+}
+.tsGridHead,
+.tsGridRow {
+  display: grid;
+  grid-template-columns: minmax(210px,1.15fr) repeat(2,minmax(108px,.6fr)) minmax(92px,.45fr) minmax(220px,1fr) minmax(92px,.42fr) minmax(160px,.6fr);
+  gap: 12px;
+  align-items: center;
+}
+.tsGridHead {
+  padding: 0 2px;
+  color: var(--setu-muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.tsRowWrap {
+  border: 1px solid var(--setu-border);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.72);
+  padding: 14px;
+}
+.tsControl { width: 100%; }
+.tsNotesInput { min-width: 0; }
+.tsStatusCell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tsRemoveBtn { min-width: 40px; }
+.tsRejectReason {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(220,38,38,0.18);
+  background: rgba(220,38,38,0.06);
+  color: #991b1b;
+  font-size: 13px;
+}
+@media (max-width: 1100px) {
+  .tsGridHead { display: none; }
+  .tsGridRow { grid-template-columns: 1fr 1fr; }
+  .tsStatusCell { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+  .tsGridRow { grid-template-columns: 1fr; }
+  .tsSummaryRow, .tsDayHeader { align-items: stretch; }
+}

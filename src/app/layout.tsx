@@ -8,9 +8,11 @@ export const metadata = {
   manifest: "/site.webmanifest",
   applicationName: "SETU Track",
   appleWebApp: {
-    capable: true,
     title: "SETU Track",
     statusBarStyle: "default",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
   icons: {
     icon: [

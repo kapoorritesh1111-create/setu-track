@@ -25,7 +25,7 @@ export default function Drawer(props: {
   width?: number | string; // default 560px / 92vw
 }) {
   const w = props.width ?? "min(560px, 92vw)";
-  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   // Escape to close
   useEffect(() => {
@@ -37,10 +37,10 @@ export default function Drawer(props: {
     return () => document.removeEventListener("keydown", onKey);
   }, [props.open, props.onClose]);
 
-  // Focus trap-lite: focus overlay so screen readers announce dialog quickly
+  // Focus trap-lite: focus the drawer panel so keyboard users land inside the dialog.
   useEffect(() => {
     if (!props.open) return;
-    overlayRef.current?.focus?.();
+    panelRef.current?.focus?.();
   }, [props.open]);
 
   const hasTabs = (props.tabs?.length ?? 0) > 0 && !!props.onTabChange;
@@ -74,18 +74,17 @@ export default function Drawer(props: {
   return (
     <>
       <div
-        ref={overlayRef}
-        tabIndex={-1}
         className="mwPanelOverlay"
         onClick={props.onClose}
-        aria-hidden="true"
       />
 
       <aside
+        ref={panelRef}
         className="mwPanel"
         role="dialog"
         aria-modal="true"
         aria-label={props.title}
+        tabIndex={-1}
         style={{ width: w }}
       >
         <div className="mwPanelHeader">

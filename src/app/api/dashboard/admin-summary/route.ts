@@ -51,8 +51,8 @@ export async function POST(req: Request) {
         .limit(1)
         .maybeSingle(),
       supa
-        .from("time_entries")
-        .select("user_id,status,hours,hourly_rate_snapshot,entry_date")
+        .from("v_time_entries")
+        .select("user_id,status,hours_worked,hourly_rate_snapshot,entry_date")
         .eq("org_id", profile.org_id)
         .gte("entry_date", period_start)
         .lte("entry_date", period_end),
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     let pendingEntries = 0;
 
     for (const row of (entries || []) as any[]) {
-      const hours = Number(row.hours ?? 0);
+      const hours = Number(row.hours_worked ?? 0);
       const rate = Number(row.hourly_rate_snapshot ?? 0);
       if (row.status === "approved") {
         approvedHours += hours;

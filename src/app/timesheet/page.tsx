@@ -8,6 +8,7 @@ import { supabase } from "../../lib/supabaseBrowser";
 import { useProfile } from "../../lib/useProfile";
 import { addDays, formatShort, startOfWeekSunday, toISODate, weekRangeLabel } from "../../lib/date";
 import { StatusChip } from "../../components/ui/StatusChip";
+import Button from "../../components/ui/Button";
 
 type Project = {
   id: string;
@@ -354,29 +355,30 @@ function SetuTrackInner() {
   const headerRight = (
     <div className="tsHeaderRight">
       <div className="tsWeekNav">
-        <button className="pill" onClick={() => setWeekStart((d) => addDays(d, -7))} disabled={busy || loadingWeek} title="Previous week">
+        <button className="btn btnSecondary btnSm" onClick={() => setWeekStart((d) => addDays(d, -7))} disabled={busy || loadingWeek} title="Previous week" type="button">
           ← Prev
         </button>
         <button
-          className="pill"
+          className="btn btnSecondary btnSm"
+          type="button"
           onClick={() => setWeekStart(startOfWeekSunday(new Date()))}
           disabled={busy || loadingWeek}
           title="Jump to current week"
         >
           This week
         </button>
-        <button className="pill" onClick={() => setWeekStart((d) => addDays(d, 7))} disabled={busy || loadingWeek} title="Next week">
+        <button className="btn btnSecondary btnSm" onClick={() => setWeekStart((d) => addDays(d, 7))} disabled={busy || loadingWeek} title="Next week" type="button">
           Next →
         </button>
       </div>
 
       <div className="tsActions">
-        <button disabled={busy || loadingWeek} onClick={saveDraft}>
-          {busy ? "Saving…" : "Save Draft"}
-        </button>
-        <button className="btnPrimary" disabled={busy || loadingWeek} onClick={submitWeek}>
-          {busy ? "Working…" : "Submit Week"}
-        </button>
+        <Button variant="secondary" disabled={busy || loadingWeek} onClick={saveDraft}>
+          {busy ? "Saving…" : "Save draft"}
+        </Button>
+        <Button variant="primary" disabled={busy || loadingWeek} onClick={submitWeek}>
+          {busy ? "Working…" : "Submit week"}
+        </Button>
       </div>
     </div>
   );
@@ -458,6 +460,7 @@ function SetuTrackInner() {
                     <div key={r.tempId} className="tsRowWrap">
                       <div className="tsGridRow">
                         <select
+                          className="input tsControl"
                           value={r.project_id}
                           disabled={locked || (isContractor && projects.length === 0)}
                           onChange={(e) => updateRow(r.tempId, { project_id: e.target.value })}
@@ -470,11 +473,12 @@ function SetuTrackInner() {
                           ))}
                         </select>
 
-                        <input type="time" step={60} value={r.time_in} disabled={locked} onChange={(e) => updateRow(r.tempId, { time_in: e.target.value })} />
+                        <input className="input tsControl" type="time" step={60} value={r.time_in} disabled={locked} onChange={(e) => updateRow(r.tempId, { time_in: e.target.value })} />
 
-                        <input type="time" step={60} value={r.time_out} disabled={locked} onChange={(e) => updateRow(r.tempId, { time_out: e.target.value })} />
+                        <input className="input tsControl" type="time" step={60} value={r.time_out} disabled={locked} onChange={(e) => updateRow(r.tempId, { time_out: e.target.value })} />
 
                         <input
+                          className="input tsControl"
                           value={r.lunch_hours}
                           disabled={locked}
                           onChange={(e) => updateRow(r.tempId, { lunch_hours: Number(e.target.value) })}
@@ -484,6 +488,7 @@ function SetuTrackInner() {
                         />
 
                         <input
+                          className="input tsControl tsNotesInput"
                           value={r.notes}
                           disabled={locked}
                           onChange={(e) => updateRow(r.tempId, { notes: e.target.value })}
@@ -491,6 +496,7 @@ function SetuTrackInner() {
                         />
 
                         <input
+                          className="input tsControl"
                           value={r.mileage}
                           disabled={locked}
                           onChange={(e) => updateRow(r.tempId, { mileage: Number(e.target.value) })}
@@ -502,9 +508,9 @@ function SetuTrackInner() {
                         <div className="tsStatusCell">
                           <StatusPill status={(r.status ?? "draft") as EntryStatus} />
                           {!locked ? (
-                            <button className="btnDanger tsRemoveBtn" onClick={() => removeLine(r.tempId)} title="Remove line">
+                            <Button variant="danger" size="sm" className="tsRemoveBtn" onClick={() => removeLine(r.tempId)} title="Remove line" type="button">
                               ✕
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                       </div>
@@ -519,13 +525,15 @@ function SetuTrackInner() {
                 })}
 
                 <div style={{ marginTop: 10 }}>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => addLine(dayISO)}
                     disabled={isContractor && projects.length === 0}
                     title={isContractor && projects.length === 0 ? "Admin must assign a project first" : "Add a new line"}
                   >
                     + Add line
-                  </button>
+                  </Button>
                 </div>
               </section>
             );

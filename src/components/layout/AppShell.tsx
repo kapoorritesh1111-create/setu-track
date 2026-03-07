@@ -163,7 +163,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
 
           <button
             type="button"
-            className="mwBrand mwBrandButton"
+            className="mwBrand mwBrandButton mwDesktopHidden"
             onClick={() => go("/dashboard")}
             aria-label="Go to dashboard"
           >
@@ -260,7 +260,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
           >
             <img
               className="mwSidebarLogo"
-              src="/brand/setu-track-logo.svg"
+              src="/brand/setu-track-logo-dark.png"
               alt="SETU TRACK"
             />
           </button>
@@ -300,7 +300,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
               >
                 <img
                   className="mwSidebarLogo"
-                  src="/brand/setu-track-logo.svg"
+                  src="/brand/setu-track-logo-dark.png"
                   alt="SETU TRACK"
                 />
               </button>
