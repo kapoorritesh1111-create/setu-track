@@ -80,11 +80,12 @@ function pctChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
-function riskTone(risk: string): "success" | "warn" | "danger" | "info" {
-  if (risk === "healthy") return "success";
-  if (risk === "watch") return "info";
-  if (risk === "high") return "warn";
-  return "danger";
+function riskState(risk: string): "approved" | "open" | "submitted" | "rejected" | "draft" {
+  if (risk === "healthy") return "approved";
+  if (risk === "watch") return "open";
+  if (risk === "high") return "submitted";
+  if (risk === "over") return "rejected";
+  return "draft";
 }
 
 export default function AdminDashboard({ orgId }: { orgId: string; userId: string }) {
@@ -355,7 +356,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
                       Budget {row.currency} {money(row.budget_amount)} • Used {row.currency} {money(row.payroll_cost)} • Remaining {row.currency} {money(row.remaining_budget)}
                     </div>
                   </div>
-                  <StatusChip state={riskTone(row.risk)} label={row.risk === "untracked" ? "Untracked" : row.risk} />
+                  <StatusChip state={riskState(row.risk)} label={row.risk === "untracked" ? "Untracked" : row.risk} />
                 </div>
               ))}
             </div>

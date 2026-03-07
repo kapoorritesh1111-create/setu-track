@@ -9,6 +9,7 @@ import MetaFooter from "../../../components/ui/MetaFooter";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import ExportReceiptDrawer from "../../../components/ui/ExportReceiptDrawer";
 import { apiJson } from "../../../lib/api/client";
+import WorkspaceKpiStrip from "../../../components/setu/WorkspaceKpiStrip";
 
 type ExportReceipt = {
   id: string;
@@ -155,7 +156,17 @@ export default function AdminExportsPage() {
       <div style={{ maxWidth: 1280 }}>
         <AdminTabs active="exports" />
 
-        <div className="setuCompareGrid" style={{ marginTop: 12 }}>
+        
+        <WorkspaceKpiStrip
+          items={[
+            { label: "Receipts", value: String(rows.length), hint: "Tracked export receipts" },
+            { label: "Project-linked", value: String(totals.linked), hint: "End-to-end client export linkage" },
+            { label: "Paid", value: String(totals.paid), hint: "Receipts connected to paid exports" },
+            { label: "Changed payloads", value: String(totals.changed), hint: "Diff-status receipts" },
+          ]}
+        />
+
+<div className="setuCompareGrid" style={{ marginTop: 12 }}>
           <div className="setuCompareCard setuCompareCardPrimary">
             <div className="setuCompareLabel">Total receipts</div>
             <div className="setuCompareValue">{rows.length}</div>

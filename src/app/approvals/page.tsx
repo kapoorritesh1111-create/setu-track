@@ -11,6 +11,7 @@ import { addDays, parseISODate, startOfWeekSunday, toISODate, weekRangeLabel } f
 import Drawer from "../../components/ui/Drawer";
 import { StatusChip } from "../../components/ui/StatusChip";
 import ActionMenu from "../../components/ui/ActionMenu";
+import WorkspaceKpiStrip from "../../components/setu/WorkspaceKpiStrip";
 
 type EntryStatus = "draft" | "submitted" | "approved" | "rejected";
 
@@ -484,7 +485,17 @@ useEffect(() => {
         </div>
       ) : null}
 
-      <div className="apQueueSummary">
+      
+      <WorkspaceKpiStrip
+        items={[
+          { label: "Approval groups", value: String(queueTotals.groups), hint: showAllPending ? "Last 8 weeks" : `${weekStartISO} → ${weekEndISO}` },
+          { label: "Submitted entries", value: String(queueTotals.entries), hint: "Awaiting manager review" },
+          { label: "Hours pending", value: queueTotals.hours.toFixed(2), hint: "Submitted hours in queue" },
+          { label: "Flagged groups", value: String(queueTotals.flagged_groups), hint: "Anomaly watchlist" },
+        ]}
+      />
+
+<div className="apQueueSummary">
         <div className="apQueueMetric"><span>Groups</span><strong>{queueTotals.groups}</strong></div>
         <div className="apQueueMetric"><span>Entries</span><strong>{queueTotals.entries}</strong></div>
         <div className="apQueueMetric"><span>Hours</span><strong>{queueTotals.hours.toFixed(2)}</strong></div>
@@ -520,7 +531,7 @@ useEffect(() => {
                     <div className="muted apGroupMeta">
                       <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
                         <span>Week: {g.week_start} → {g.week_end} • {g.entries.length} entries</span>
-                        {isLocked ? <span className="badge badgeLocked">Locked</span> : <span className="badge">Open</span>}
+                        {isLocked ? <StatusChip state="locked" /> : <StatusChip state="open" />}
                       </span>
                     </div>
 

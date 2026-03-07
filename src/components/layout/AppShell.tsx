@@ -174,8 +174,8 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
             onClick={() => go("/dashboard")}
             aria-label="Go to dashboard"
           >
-            <span className="mwHeaderBrandMark">
-              <img src="/brand/setu-knot-icon.svg" alt="" aria-hidden="true" />
+            <span className="mwHeaderBrandMark mwHeaderBrandMarkIconOnly">
+              <img src="/brand/setu-knot-icon.png" alt="" aria-hidden="true" />
             </span>
             <span className="mwHeaderBrandText">
               <span className="mwHeaderBrandTitle">SETU TRACK</span>
@@ -268,10 +268,9 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
           >
             <span className="mwSidebarBrandMark">
               <img
-                className="mwSidebarKnot"
-                src="/brand/setu-knot-icon.svg"
-                alt=""
-                aria-hidden="true"
+                className="mwSidebarLogo"
+                src="/brand/setu-track-logo-dark.png"
+                alt="SETU TRACK"
               />
             </span>
             <span className="mwSidebarBrandCopy">
@@ -315,7 +314,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
                 aria-label="Go to dashboard"
               >
                 <span className="mwSidebarBrandMark">
-                  <img className="mwSidebarKnot" src="/brand/setu-knot-icon.svg" alt="" aria-hidden="true" />
+                  <img className="mwSidebarLogo" src="/brand/setu-track-logo-dark.png" alt="SETU TRACK" />
                 </span>
                 <span className="mwSidebarBrandCopy">
                   <span className="mwSidebarEyebrow">CONNECT • TRACK • GROW</span>

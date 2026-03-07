@@ -1,36 +1,102 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiJson } from "../../lib/api/client";
+import { useProfile } from "../../lib/useProfile";
 
-type Metric = { label: string; value: string; hint: string; tone?: "teal" | "blue" | "violet" | "amber" };
-type WatchItem = { title: string; meta: string; status: string; tone?: "ok" | "warn" | "risk" };
+type OverviewPayload = {
+  ok: true;
+  metrics: {
+    active_contractors: number;
+    hours_logged: number;
+    approved_hours: number;
+    approvals_pending: number;
+    payroll_ready: number;
+    current_payroll_total: number;
+    currency: string;
+  };
+  watchlist: Array<{
+    project_id: string;
+    project_name: string;
+    payroll_cost: number;
+    budget_amount: number;
+    remaining_budget: number;
+    risk: string;
+    currency: string;
+  }>;
+};
 
-const metrics: Metric[] = [
-  { label: "Active contractors", value: "34", hint: "12 submitting this week", tone: "blue" },
-  { label: "Hours logged", value: "482h", hint: "Current operational window", tone: "teal" },
-  { label: "Payroll ready", value: "$21.2k", hint: "Approved and exportable", tone: "teal" },
-  { label: "Approvals pending", value: "5", hint: "Needs manager attention", tone: "violet" },
-];
+type MetricTone = "teal" | "blue" | "violet" | "amber";
 
-const watchlist: WatchItem[] = [
-  { title: "Website Redesign", meta: "83% budget used", status: "On track", tone: "ok" },
-  { title: "Mobile App Development", meta: "31% margin", status: "Healthy", tone: "ok" },
-  { title: "Digital Marketing Campaign", meta: "91% budget used", status: "At risk", tone: "risk" },
-  { title: "Client Onboarding", meta: "2 approvals blocked", status: "Needs review", tone: "warn" },
-];
-
-function toneClass(tone?: Metric["tone"]) {
+function toneClass(tone?: MetricTone) {
   return tone ? `setu-tone-${tone}` : "setu-tone-blue";
 }
 
-function watchToneClass(tone?: WatchItem["tone"]) {
-  if (tone === "ok") return "pill ok";
-  if (tone === "risk") return "pill warn";
+function watchToneClass(risk?: string) {
+  if (risk === "healthy") return "pill ok";
+  if (risk === "watch") return "pill";
+  if (risk === "high") return "pill warn";
+  if (risk === "over") return "pill pillError";
   return "pill";
+}
+
+function money(amount: number, currency = "USD") {
+  return `${currency} ${Number(amount || 0).toFixed(0)}`;
 }
 
 export default function CommandCenterHero() {
   const router = useRouter();
+  const { profile } = useProfile() as any;
+  const [data, setData] = useState<OverviewPayload | null>(null);
+
+  const role = profile?.role || "contractor";
+  const canLoadOverview = role === "admin" || role === "manager";
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!canLoadOverview) return;
+    (async () => {
+      try {
+        const json = await apiJson<OverviewPayload>("/api/dashboard/overview");
+        if (!cancelled) setData(json);
+      } catch {
+        if (!cancelled) setData(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadOverview]);
+
+  const metrics = useMemo(() => {
+    if (!data) {
+      return [
+        { label: "Active contractors", value: "—", hint: "Loading live org metrics", tone: "blue" as MetricTone },
+        { label: "Hours logged", value: "—", hint: "Current operational window", tone: "teal" as MetricTone },
+        { label: "Payroll ready", value: "—", hint: "Approved and exportable", tone: "teal" as MetricTone },
+        { label: "Approvals pending", value: "—", hint: "Needs manager attention", tone: "violet" as MetricTone },
+      ];
+    }
+
+    return [
+      { label: "Active contractors", value: String(data.metrics.active_contractors), hint: `${data.metrics.approved_hours.toFixed(2)} approved hours`, tone: "blue" as MetricTone },
+      { label: "Hours logged", value: `${data.metrics.hours_logged.toFixed(2)}h`, hint: "Current month operational window", tone: "teal" as MetricTone },
+      { label: "Payroll ready", value: money(data.metrics.payroll_ready, data.metrics.currency), hint: "Approved and exportable", tone: "teal" as MetricTone },
+      { label: "Approvals pending", value: String(data.metrics.approvals_pending), hint: "Manager action queue", tone: "violet" as MetricTone },
+    ];
+  }, [data]);
+
+  const watchlist = data?.watchlist?.length
+    ? data.watchlist.map((item) => ({
+        title: item.project_name,
+        meta: item.budget_amount ? `${Math.max(0, Math.round((item.payroll_cost / item.budget_amount) * 100))}% budget used` : "Budget not tracked",
+        status: item.risk === "healthy" ? "Healthy" : item.risk === "watch" ? "Watching" : item.risk === "high" ? "At risk" : item.risk === "over" ? "Over budget" : "Untracked",
+        tone: item.risk,
+      }))
+    : [
+        { title: "Project watchlist", meta: "Budget and payroll watchlist will populate here", status: "Monitoring", tone: "watch" },
+      ];
 
   return (
     <section className="setuCommandCenter">
@@ -40,8 +106,7 @@ export default function CommandCenterHero() {
             <div className="setuEyebrow">SETU command center</div>
             <h2 className="setuHeroTitle">Connect work, payroll, and growth in one finance-grade workspace.</h2>
             <p className="setuHeroCopy">
-              The dashboard now orients around operational status, payroll readiness, project budget health,
-              and next actions instead of disconnected modules.
+              Operational status, payroll readiness, project budget health, and next actions now sit in one command surface.
             </p>
           </div>
 

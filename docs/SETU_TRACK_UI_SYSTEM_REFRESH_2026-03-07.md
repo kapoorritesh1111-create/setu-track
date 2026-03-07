@@ -36,3 +36,10 @@ instead of a collection of disconnected pages.
 3. redesign Payroll Runs and Exports with the same visual hierarchy
 4. normalize status pills and table presentation across every operational view
 5. complete mobile/tablet behavior review once the shared system is fully migrated
+
+
+## Pass 2 — Brand + Finance Workflow Normalization
+- applied the new locked logo pack to public brand assets, favicons, app icons, and manifest-facing icons
+- extended the SETU UI system into Payroll Runs, Exports, Approvals, and Admin Settings
+- replaced demo analytics/dashboard hero values with live dashboard aggregation routes
+- normalized status presentation toward shared StatusChip language and improved responsive shell behavior
