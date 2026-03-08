@@ -71,11 +71,6 @@ function money(x: number) {
   return x.toFixed(2);
 }
 
-function monthLabel(startISO: string) {
-  const d = new Date(`${startISO}T00:00:00`);
-  return d.toLocaleString(undefined, { month: "long", year: "numeric" });
-}
-
 function pctChange(current: number, previous: number) {
   if (!previous && !current) return 0;
   if (!previous) return 100;
@@ -90,17 +85,39 @@ function riskState(risk: string): "approved" | "open" | "submitted" | "rejected"
   return "draft";
 }
 
+type DashboardPreset = "current_week" | "last_week" | "current_month" | "last_month" | "custom";
+
 export default function AdminDashboard({ orgId }: { orgId: string; userId: string }) {
   const router = useRouter();
-  const [preset, setPreset] = useState<"today" | "current_week" | "current_month">("current_week");
+  const [preset, setPreset] = useState<DashboardPreset>("current_week");
+  const initialRange = useMemo(() => presetToRange("current_week", "sunday"), []);
+  const [startDate, setStartDate] = useState(initialRange.start);
+  const [endDate, setEndDate] = useState(initialRange.end);
+
   const range = useMemo(() => {
-    if (preset === "today") { const now = new Date(); const iso = now.toISOString().slice(0,10); return { start: iso, end: iso }; }
+    if (preset === "custom") return null;
     return presetToRange(preset, "sunday");
   }, [preset]);
-  const currentMonthRange = useMemo(() => presetToRange("current_month", "sunday"), []);
-  const previousMonthRange = useMemo(() => presetToRange("last_month", "sunday"), []);
-  const [startDate, setStartDate] = useState(range.start);
-  const [endDate, setEndDate] = useState(range.end);
+
+  const comparisonRange = useMemo(() => {
+    if (preset === "current_week") return presetToRange("last_week", "sunday");
+    if (preset === "last_week") return presetToRange("current_week", "sunday");
+    if (preset === "current_month") return presetToRange("last_month", "sunday");
+    if (preset === "last_month") return presetToRange("current_month", "sunday");
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return { start: startDate, end: endDate };
+    }
+    const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+    const comparisonEnd = new Date(start);
+    comparisonEnd.setDate(start.getDate() - 1);
+    const comparisonStart = new Date(comparisonEnd);
+    comparisonStart.setDate(comparisonEnd.getDate() - (diffDays - 1));
+    const toIso = (d: Date) => d.toISOString().slice(0, 10);
+    return { start: toIso(comparisonStart), end: toIso(comparisonEnd) };
+  }, [preset, startDate, endDate]);
 
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [rows, setRows] = useState<VRow[]>([]);
@@ -120,9 +137,10 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {
+    if (!range) return;
     setStartDate(range.start);
     setEndDate(range.end);
-  }, [range.start, range.end]);
+  }, [range?.start, range?.end]);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,8 +217,8 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
       try {
         const [selected, currentMonth, previousMonth, financial] = await Promise.all([
           fetchSummary(startDate, endDate),
-          fetchSummary(currentMonthRange.start, currentMonthRange.end),
-          fetchSummary(previousMonthRange.start, previousMonthRange.end),
+          fetchSummary(startDate, endDate),
+          fetchSummary(comparisonRange.start, comparisonRange.end),
           apiJson<FinancialPayload>(`/api/dashboard/financial-intelligence?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`),
         ]);
         if (cancelled) return;
@@ -220,7 +238,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
     return () => {
       cancelled = true;
     };
-  }, [startDate, endDate, currentMonthRange.start, currentMonthRange.end, previousMonthRange.start, previousMonthRange.end]);
+  }, [startDate, endDate, comparisonRange.start, comparisonRange.end]);
 
   const { approvedHours, approvedPay, pendingCount } = useMemo(() => {
     let ah = 0;
@@ -265,6 +283,14 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [contractors, rows]);
 
+  const presetMeta: Record<Exclude<DashboardPreset, "custom">, { label: string; comparisonLabel: string }> = {
+    current_week: { label: "Current week", comparisonLabel: "Last week" },
+    last_week: { label: "Last week", comparisonLabel: "Current week" },
+    current_month: { label: "Current month", comparisonLabel: "Last month" },
+    last_month: { label: "Last month", comparisonLabel: "Current month" },
+  };
+  const activePeriodLabel = preset === "custom" ? "Custom range" : presetMeta[preset].label;
+  const comparisonPeriodLabel = preset === "custom" ? "Previous range" : presetMeta[preset].comparisonLabel;
   const currentPayroll = Number(currentMonthSummary?.total_amount ?? 0);
   const previousPayroll = Number(previousMonthSummary?.total_amount ?? 0);
   const payrollDeltaPct = pctChange(currentPayroll, previousPayroll);
@@ -324,10 +350,12 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
             <div className="label">Global dashboard period</div>
             <div className="dbControlTitle">Drive KPIs, readiness, and activity from one reporting window.</div>
           </div>
-          <div className="dbPeriodActions">
-            <button className={`pill ${preset === "today" ? "ok" : ""}`} onClick={() => setPreset("today")}>Today</button>
-            <button className={`pill ${preset === "current_week" ? "ok" : ""}`} onClick={() => setPreset("current_week")}>This week</button>
-            <button className={`pill ${preset === "current_month" ? "ok" : ""}`} onClick={() => setPreset("current_month")}>This month</button>
+          <div className="dbPeriodActions" style={{ gap: 8, flexWrap: "wrap" }}>
+            <button className={`pill ${preset === "current_week" ? "ok" : ""}`} onClick={() => setPreset("current_week")}>Current week</button>
+            <button className={`pill ${preset === "last_week" ? "ok" : ""}`} onClick={() => setPreset("last_week")}>Last week</button>
+            <button className={`pill ${preset === "current_month" ? "ok" : ""}`} onClick={() => setPreset("current_month")}>Current month</button>
+            <button className={`pill ${preset === "last_month" ? "ok" : ""}`} onClick={() => setPreset("last_month")}>Last month</button>
+            <button className={`pill ${preset === "custom" ? "ok" : ""}`} onClick={() => setPreset("custom")}>Custom</button>
           </div>
         </div>
         <div className="dbQueueGrid">
@@ -336,13 +364,34 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
           <div className="dbQueueItem"><span>Budget alerts</span><strong>{financials?.analytics.budget_risk_alerts || 0}</strong></div>
           <div className="dbQueueItem"><span>Export ledger</span><strong>{financials?.analytics.export_history_count || 0}</strong></div>
         </div>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "end", marginTop: 12 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span className="label">Preset</span>
+            <select className="select" value={preset} onChange={(e) => setPreset(e.target.value as DashboardPreset)}>
+              <option value="current_week">Current week</option>
+              <option value="last_week">Last week</option>
+              <option value="current_month">Current month</option>
+              <option value="last_month">Last month</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span className="label">Start</span>
+            <input className="input" type="date" value={startDate} onChange={(e) => { setPreset("custom"); setStartDate(e.target.value); }} />
+          </label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span className="label">End</span>
+            <input className="input" type="date" value={endDate} onChange={(e) => { setPreset("custom"); setEndDate(e.target.value); }} />
+          </label>
+          <div className="muted" style={{ paddingBottom: 8 }}>Comparison window: {comparisonRange.start} → {comparisonRange.end}</div>
+        </div>
       </CardPad>
 
       <MetricsRow>
         <StatCard label="Approved hours" value={`${approvedHours.toFixed(2)} hrs`} hint={`${startDate} → ${endDate}`} />
         <StatCard label="Approved payroll" value={`${currency} ${money(approvedPay)}`} hint={`${pendingCount} pending entries`} />
-        <StatCard label="Current month" value={`${currency} ${money(currentPayroll)}`} hint={`${monthLabel(currentMonthRange.start)}`} />
-        <StatCard label="vs last month" value={`${payrollDeltaPct >= 0 ? "+" : ""}${payrollDeltaPct.toFixed(1)}%`} hint={`${monthLabel(previousMonthRange.start)}`} />
+        <StatCard label={activePeriodLabel} value={`${currency} ${money(currentPayroll)}`} hint={`${startDate} → ${endDate}`} />
+        <StatCard label={`vs ${comparisonPeriodLabel.toLowerCase()}`} value={`${payrollDeltaPct >= 0 ? "+" : ""}${payrollDeltaPct.toFixed(1)}%`} hint={`${comparisonRange.start} → ${comparisonRange.end}`} />
       </MetricsRow>
 
       
@@ -415,10 +464,12 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
       <CardPad>
         <SectionHeader title="Period actions" subtitle="Close the selected period only after blockers are resolved" />
         <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-          <select className="select" value={preset} onChange={(e) => setPreset(e.target.value as any)}>
-            <option value="today">Today</option>
-            <option value="current_week">This week</option>
-            <option value="current_month">This month</option>
+          <select className="select" value={preset} onChange={(e) => setPreset(e.target.value as DashboardPreset)}>
+            <option value="current_week">Current week</option>
+            <option value="last_week">Last week</option>
+            <option value="current_month">Current month</option>
+            <option value="last_month">Last month</option>
+            <option value="custom">Custom range</option>
           </select>
           <button className="pill" onClick={previewClose} disabled={previewBusy}>{previewBusy ? "Checking…" : "Preview close"}</button>
           <button className="btnPrimary" onClick={closePayroll} disabled={closing || periodLocked}>{periodLocked ? "Locked" : closing ? "Locking…" : "Lock payroll"}</button>

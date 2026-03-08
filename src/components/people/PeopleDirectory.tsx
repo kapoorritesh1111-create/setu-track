@@ -337,6 +337,23 @@ export default function PeopleDirectory({
     setScope("visible");
   }
 
+  const stripItems = useMemo(() => {
+    const managerCount = visibleRows.filter((row) => row.role === "manager").length;
+    const contractorRows = visibleRows.filter((row) => row.role === "contractor");
+    const readyForPayroll = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) > 0).length;
+    const needsAction = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) <= 0).length;
+    const avgRate = contractorRows.length
+      ? contractorRows.reduce((sum, row) => sum + Number(row.hourly_rate || 0), 0) / contractorRows.length
+      : 0;
+    return [
+      { label: "Active people", value: String(counts.active), hint: `${counts.total} visible in directory` },
+      { label: "Ready for payroll", value: String(readyForPayroll), hint: "Active contractors with hourly rates" },
+      { label: "Needs action", value: String(needsAction), hint: "Active contractors missing rate data" },
+      { label: "Managers", value: String(managerCount), hint: avgRate > 0 ? `Avg contractor rate $${avgRate.toFixed(0)}/hr` : "Rate data appears as profiles are completed" },
+    ];
+  }, [visibleRows, counts]);
+
+
   if (loading) {
     return <div className="card" style={{ padding: 16 }}>Loading…</div>;
   }
@@ -365,21 +382,6 @@ export default function PeopleDirectory({
   }
 
 
-  const stripItems = useMemo(() => {
-    const managerCount = visibleRows.filter((row) => row.role === "manager").length;
-    const contractorRows = visibleRows.filter((row) => row.role === "contractor");
-    const readyForPayroll = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) > 0).length;
-    const needsAction = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) <= 0).length;
-    const avgRate = contractorRows.length
-      ? contractorRows.reduce((sum, row) => sum + Number(row.hourly_rate || 0), 0) / contractorRows.length
-      : 0;
-    return [
-      { label: "Active people", value: String(counts.active), hint: `${counts.total} visible in directory` },
-      { label: "Ready for payroll", value: String(readyForPayroll), hint: "Active contractors with hourly rates" },
-      { label: "Needs action", value: String(needsAction), hint: "Active contractors missing rate data" },
-      { label: "Managers", value: String(managerCount), hint: avgRate > 0 ? `Avg contractor rate $${avgRate.toFixed(0)}/hr` : "Rate data appears as profiles are completed" },
-    ];
-  }, [visibleRows, counts]);
 
   return (
     <div className="peopleWrap">
