@@ -5,7 +5,9 @@ export const BRAND = {
   description: "Contractor operations, payroll intelligence, and analytics",
   logo: {
     full: "/brand/logo.svg",
-    fullPng: "/brand/logo@2x.png",
+    fullLightPng: "/brand/setu-logo-horizontal-light.png",
+    fullDarkPng: "/brand/setu-logo-horizontal-dark.png",
+    fullPng: "/brand/setu-logo-horizontal-light.png",
     mark: "/brand/logo-mark.svg",
     markPng: "/brand/logo-mark.png",
   },

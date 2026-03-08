@@ -61,6 +61,16 @@ What should work end-to-end in this baseline:
 - Admin Export Center: `/admin/exports` (audit log + receipt drill-in)
 
 See `docs/RELEASE_CHECKLIST.md` for the full completed list + verification steps.
+## Local environment
+
+Copy `.env.example` to `.env.local` and set:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_APP_URL`
+
+Recommended verification doc: `docs/QA_VERIFICATION_CHECKLIST_2026-03-08.md`.
+
 ## Run locally
 
 ```bash

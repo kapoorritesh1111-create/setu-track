@@ -1411,3 +1411,7 @@ html[data-theme="dark"] .brandTagline,
 html[data-theme="dark"] .setuLoginTagline { color: var(--setu-cyan-300); }
 html[data-theme="dark"] .dbQueueItem,
 html[data-theme="dark"] .tsSuccessBanner { color: var(--setu-text); }
+
+.brandLockup picture { display: block; }
+.setuErrorPage { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, rgba(40, 192, 199, 0.14), transparent 32%), var(--setu-bg, #f5f7fc); }
+.setuErrorPage .card { width: min(100%, 640px); }

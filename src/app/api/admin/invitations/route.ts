@@ -1,6 +1,7 @@
 // src/app/api/admin/invitations/route.ts
 import { NextResponse } from "next/server";
 import { supabaseService } from "../../../../lib/supabaseServer";
+import { buildAuthCallbackUrl } from "../../../../lib/appUrl";
 
 async function requireAdmin(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     if (!email) return NextResponse.json({ ok: false, error: "Email required" }, { status: 400 });
 
-    const redirectTo = (`${process.env.NEXT_PUBLIC_SETUE_URL || ""}/auth/callback`).trim() || undefined;
+    const redirectTo = buildAuthCallbackUrl();
 
     const { data, error } = await supa.auth.admin.generateLink({
       type: "invite",

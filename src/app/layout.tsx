@@ -8,12 +8,13 @@ export const metadata = {
     "SETU TRACK by SETU GROUP — branded workforce time tracking, payroll operations, and export control.",
   manifest: "/site.webmanifest",
   applicationName: "SETU Track",
+  themeColor: "#0e2f63",
   icons: {
     icon: [
       { url: "/favicon.ico" },
-      { url: "/brand/logo-mark.png", sizes: "512x512", type: "image/png" },
+      { url: "/brand/setu-symbol-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/brand/logo-mark.png",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "SETU TRACK",

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "./supabaseBrowser";
+import { assertBrowserEnv, supabase } from "./supabaseBrowser";
 
 export type Profile = {
   id: string;
@@ -61,6 +61,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
+      assertBrowserEnv();
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
 
@@ -92,7 +93,7 @@ export function useProfile(): UseProfileResult {
     hydrate({ showLoading: true });
 
     // Auth events: do NOT flip loading=true (prevents “stuck loading” / flicker loops)
-    const { data } = supabase.auth.onAuthStateChange((event) => {
+    const { data } = supabase.auth.onAuthStateChange((event: string) => {
       if (!mountedRef.current) return;
 
       // Only re-hydrate on meaningful auth events

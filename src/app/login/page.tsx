@@ -40,13 +40,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="setuLoginPage">
+    <main className="setuLoginPage" aria-labelledby="setu-login-title">
       <section className="setuLoginHero">
         <div className="setuLoginHeroInner">
           <BrandLockup className="setuLoginLockup" showTagline={false} />
           <div className="setuLoginTagline">{BRAND.tagline}</div>
           <div className="setuLoginEyebrow">Payroll command platform</div>
-          <h1>Branded payroll operations, approvals, and export control in one SETU workspace.</h1>
+          <h1 id="setu-login-title">Branded payroll operations, approvals, and export control in one SETU workspace.</h1>
           <p>Keep project time, payroll runs, receipts, and finance-ready exports aligned across admins, managers, and contractors.</p>
           <div className="setuLoginFeatureGrid">
             <div className="setuLoginFeatureCard"><ShieldCheck size={18} /><div><strong>Audit-ready payroll</strong><span>Closed periods, immutable runs, receipt history, and paid-state tracking.</span></div></div>
@@ -54,7 +54,7 @@ export default function LoginPage() {
           </div>
         </div>
       </section>
-      <section className="setuLoginPanelWrap">
+      <section className="setuLoginPanelWrap" aria-label="Sign in panel">
         <div className="setuLoginPanel card">
           <div className="setuLoginPanelHeader">
             <div className="setuLoginMiniBadge">SETU TRACK</div>
@@ -81,6 +81,6 @@ export default function LoginPage() {
           <div className="setuLoginFooter">A product of {BRAND.parentCompany}.</div>
         </div>
       </section>
-    </div>
+    </main>
   );
 }
