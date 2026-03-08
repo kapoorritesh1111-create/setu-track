@@ -249,7 +249,7 @@ p { margin: 0; }
 .setuSectionEyebrow { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(34,199,190,0.14); color: var(--setu-teal-500); font-size: 12px; font-weight: 800; }
 .setuSectionTitle { font-size: 22px; font-weight: 900; color: var(--setu-indigo-900); }
 .setuSectionHint { margin-top: 4px; color: var(--setu-muted); font-size: 13px; }
-.setuContentGrid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(300px,.85fr); gap: 18px; align-items: start; }
+.setuContentGrid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(300px,.85fr); gap: 18px; align-items: flex-start; }
 .setuCardHeaderRow { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 14px; }
 .setuSideStack, .setuDistributionList, .setuActivityList, .setuTrendBars { display: grid; gap: 12px; }
 .setuTrendRow, .setuDistributionItem, .setuActivityItem { display: grid; gap: 8px; }
@@ -731,7 +731,7 @@ textarea.nativeControl {
   display: grid;
   grid-template-columns: minmax(0,1fr) auto;
   gap: 18px;
-  align-items: start;
+  align-items: flex-start;
 }
 .apGroupTitle { font-size: 20px; font-weight: 900; color: var(--setu-indigo-900); }
 .apGroupMeta { margin-top: 6px; }
@@ -754,7 +754,7 @@ textarea.nativeControl {
   display: grid;
   gap: 10px;
   min-width: 260px;
-  justify-items: end;
+  justify-items: flex-end;
 }
 .apSelectToggle {
   display: inline-flex;
@@ -782,7 +782,7 @@ textarea.nativeControl {
   display: grid;
   grid-template-columns: 140px minmax(180px,1.1fr) 90px minmax(220px,1.4fr) 110px;
   gap: 14px;
-  align-items: start;
+  align-items: flex-start;
   padding: 14px 16px;
 }
 .apHead {
@@ -974,7 +974,7 @@ textarea.nativeControl {
 .setuWorkspaceActions {
   display: grid;
   gap: 12px;
-  justify-items: end;
+  justify-items: flex-end;
 }
 .setuKpiGrid {
   display: grid;
@@ -998,7 +998,7 @@ textarea.nativeControl {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: start;
+  align-items: flex-start;
 }
 .setuSectionTitle {
   font-size: 22px;
@@ -1219,4 +1219,24 @@ textarea.nativeControl {
   .setuWorkspaceHero, .setuKpiGrid, .setuCommandGrid, .setuTrendSummary { grid-template-columns: 1fr; }
   .setuSectionLead, .setuReadinessRow, .setuActivityItem, .setuFocusItem, .setuProjectItem, .setuBarHead { align-items: flex-start; flex-direction: column; }
   .setuProjectRight { text-align: left; }
+}
+
+
+/* Phase 2C sidebar cleanup */
+.mwSidebar { padding: 20px 14px 20px; }
+.mwSidebarBrand { gap: 10px; padding: 2px 2px 10px; }
+.mwSidebarBrandHero { display: flex; align-items: center; gap: 12px; justify-items: unset; padding: 12px 12px; border-radius: 18px; background: rgba(255,255,255,0.05); }
+.mwSidebarBrandMarkCompact { width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, rgba(46,196,182,0.18), rgba(31,95,175,0.12)); }
+.mwSidebarKnotCompact { width: 34px; height: 34px; }
+.mwSidebarBrandCopy { min-width: 0; }
+.mwSidebarEyebrow { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(214,230,255,0.64); }
+.mwSidebarBrandTitle { font-size: 18px; letter-spacing: .02em; }
+.mwSidebarBrandCaption { font-size: 12px; }
+.mwOrgBadge { display: none; }
+.mwSideSection { margin-top: 8px; }
+.mwSideItem { min-height: 46px; border-radius: 14px; }
+@media (max-width: 920px) {
+  .mwSidebarBrandHero { padding: 10px 12px; }
+  .mwSidebarBrandMarkCompact { width: 44px; height: 44px; }
+  .mwSidebarKnotCompact { width: 28px; height: 28px; }
 }
