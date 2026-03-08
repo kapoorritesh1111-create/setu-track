@@ -51,6 +51,8 @@ export default function AdminExportsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "changed" | "linked">("all");
 
   const columns = useMemo(
     () =>
@@ -134,6 +136,18 @@ export default function AdminExportsPage() {
     load();
   }, []);
 
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (statusFilter === "paid" && !row.meta?.is_paid) return false;
+      if (statusFilter === "changed" && row.diff_status !== "changed") return false;
+      if (statusFilter === "linked" && !row.project_export_id) return false;
+      if (!q) return true;
+      const hay = [row.label, row.type, row.project_name, row.project_id, row.actor_name, row.meta?.period_label].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search, statusFilter]);
+
   const totals = useMemo(() => {
     const linked = rows.filter((row) => !!row.project_export_id).length;
     const paid = rows.filter((row) => !!row.meta?.is_paid).length;
@@ -166,6 +180,24 @@ export default function AdminExportsPage() {
           ]}
         />
 
+        <div className="card cardPad" style={{ marginTop: 12 }}>
+          <div className="row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 900 }}>Receipt audit workbench</div>
+              <div className="muted" style={{ marginTop: 4 }}>Search receipts and narrow the ledger to the highest-risk export states.</div>
+            </div>
+            <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <input className="input" placeholder="Search receipt, project, actor" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search receipts" style={{ minWidth: 250 }} />
+              <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} aria-label="Filter receipts">
+                <option value="all">All receipts</option>
+                <option value="paid">Paid</option>
+                <option value="linked">Linked</option>
+                <option value="changed">Changed payloads</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
 <div className="setuCompareGrid" style={{ marginTop: 12 }}>
           <div className="setuCompareCard setuCompareCardPrimary">
             <div className="setuCompareLabel">Total receipts</div>
@@ -194,11 +226,11 @@ export default function AdminExportsPage() {
             <div className="card cardPad">
               <div className="muted">Loading…</div>
             </div>
-          ) : rows.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <EmptyState title="No exports yet" description="Export receipts will appear here when you generate reports." />
           ) : (
             <div className="setuExportTable">
-              <DataTable rows={rows} columns={columns} rowKey={(r: Row) => r.id} />
+              <DataTable rows={filteredRows} columns={columns} rowKey={(r: Row) => r.id} />
             </div>
           )}
         </div>

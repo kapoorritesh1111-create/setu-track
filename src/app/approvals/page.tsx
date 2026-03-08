@@ -107,6 +107,7 @@ function ApprovalsInner() {
   const [showAllPending, setShowAllPending] = useState(false); // last N weeks of submitted entries
   const [selectedGroups, setSelectedGroups] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
+  const [queueFilter, setQueueFilter] = useState<"all" | "flagged" | "locked">("all");
 
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -257,7 +258,16 @@ function ApprovalsInner() {
     }
   }
 
-  const visibleGroups = useMemo(() => groups, [groups]);
+  const visibleGroups = useMemo(() => {
+    return groups.filter((group) => {
+      if (queueFilter === "flagged") return (group.anomalies?.length || 0) > 0;
+      if (queueFilter === "locked") {
+        const key = `${group.week_start}__${group.week_end}`;
+        return !!lockByRange[key]?.locked;
+      }
+      return true;
+    });
+  }, [groups, queueFilter, lockByRange]);
 
 const selectedEntryIds = useMemo(() => {
   const ids: string[] = [];
@@ -327,6 +337,11 @@ useEffect(() => {
   const headerRight = (
     <div className="apHeaderRight">
       <div className="apToolbar">
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button className={`pill ${queueFilter === "all" ? "ok" : ""}`} onClick={() => setQueueFilter("all")} type="button">All</button>
+          <button className={`pill ${queueFilter === "flagged" ? "ok" : ""}`} onClick={() => setQueueFilter("flagged")} type="button">Flagged</button>
+          <button className={`pill ${queueFilter === "locked" ? "ok" : ""}`} onClick={() => setQueueFilter("locked")} type="button">Locked</button>
+        </div>
         <label className="apToggle">
           <input
             type="checkbox"
@@ -492,8 +507,22 @@ useEffect(() => {
           { label: "Submitted entries", value: String(queueTotals.entries), hint: "Awaiting manager review" },
           { label: "Hours pending", value: queueTotals.hours.toFixed(2), hint: "Submitted hours in queue" },
           { label: "Flagged groups", value: String(queueTotals.flagged_groups), hint: "Anomaly watchlist" },
+          { label: "Locked ranges", value: String(Object.values(lockByRange).filter((item) => item?.locked).length), hint: "Periods already locked" },
         ]}
       />
+
+      <div className="card cardPad" style={{ marginTop: 12 }}>
+        <div className="row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontWeight: 900 }}>Queue focus</div>
+            <div className="muted" style={{ marginTop: 4 }}>Use filters to isolate flagged or locked groups before taking action.</div>
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <span className="pill">View: {queueFilter}</span>
+            <span className="pill">Visible groups: {visibleGroups.length}</span>
+          </div>
+        </div>
+      </div>
 
 <div className="apQueueSummary">
         <div className="apQueueMetric"><span>Groups</span><strong>{queueTotals.groups}</strong></div>
