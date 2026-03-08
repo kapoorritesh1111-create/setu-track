@@ -1,7 +1,7 @@
 // src/app/timesheet/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import RequireOnboarding from "../../components/auth/RequireOnboarding";
 import AppShell from "../../components/layout/AppShell";
 import { supabase } from "../../lib/supabaseBrowser";
@@ -68,10 +68,15 @@ function StatusPill({ status }: { status: EntryStatus | undefined }) {
 function SetuTrackInner() {
   const { loading: profLoading, profile, userId } = useProfile();
 
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekSunday(new Date()));
+  const todayDate = useMemo(() => new Date(), []);
+  const todayISO = useMemo(() => toISODate(todayDate), [todayDate]);
+  const yesterdayISO = useMemo(() => toISODate(addDays(todayDate, -1)), [todayDate]);
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeekSunday(todayDate));
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekStartISO = useMemo(() => toISODate(weekStart), [weekStart]);
   const weekEndISO = useMemo(() => toISODate(addDays(weekStart, 6)), [weekStart]);
+  const isCurrentWeek = weekStartISO === toISODate(startOfWeekSunday(todayDate));
+  const dayRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [rows, setRows] = useState<DraftRow[]>([]);
@@ -203,6 +208,17 @@ function SetuTrackInner() {
 
   const weekTotal = useMemo(() => Object.values(hoursByDay).reduce((a, b) => a + b, 0), [hoursByDay]);
 
+  const currentWeekHasEntries = useMemo(
+    () =>
+      rows.some(
+        (r) =>
+          r.entry_date >= weekStartISO &&
+          r.entry_date <= weekEndISO &&
+          !!(r.project_id || r.time_in || r.time_out || Number(r.lunch_hours ?? 0) > 0 || Number(r.mileage ?? 0) > 0 || r.notes?.trim())
+      ),
+    [rows, weekStartISO, weekEndISO]
+  );
+
   function addLine(entryDateISO: string) {
     const tempId = `tmp_${crypto.randomUUID()}`;
     const firstProject = projects[0]?.id ?? "";
@@ -228,6 +244,126 @@ function SetuTrackInner() {
 
   function updateRow(tempId: string, patch: Partial<DraftRow>) {
     setRows((prev) => prev.map((r) => (r.tempId === tempId ? { ...r, ...patch } : r)));
+  }
+
+
+  useEffect(() => {
+    if (!isCurrentWeek || loadingWeek) return;
+    const target = dayRefs.current[todayISO];
+    if (!target) return;
+    const timeout = window.setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => window.clearTimeout(timeout);
+  }, [isCurrentWeek, todayISO, loadingWeek]);
+
+  async function copyYesterdayToToday() {
+    if (!userId) return;
+    if (!isCurrentWeek) {
+      setMsg('Switch to the current week to copy yesterday into today.');
+      return;
+    }
+    const todayHasRows = rows.some(
+      (r) => r.entry_date === todayISO && !!(r.project_id || r.time_in || r.time_out || Number(r.lunch_hours ?? 0) > 0 || Number(r.mileage ?? 0) > 0 || r.notes?.trim())
+    );
+    if (todayHasRows) {
+      setMsg('Today already has entries. Edit them directly or clear them before copying yesterday.');
+      return;
+    }
+
+    setBusy(true);
+    setMsg('');
+    try {
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('entry_date, project_id, time_in, time_out, lunch_hours, mileage, notes')
+        .eq('user_id', userId)
+        .eq('entry_date', yesterdayISO)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+
+      const entries = ((data as any[]) ?? []).filter((r) => r.project_id);
+      if (!entries.length) {
+        setMsg('No time entries found for yesterday.');
+        return;
+      }
+
+      const clones: DraftRow[] = entries.map((r) => ({
+        tempId: `tmp_${crypto.randomUUID()}`,
+        entry_date: todayISO,
+        project_id: r.project_id,
+        time_in: timeToHHMM(r.time_in),
+        time_out: timeToHHMM(r.time_out),
+        lunch_hours: Number(r.lunch_hours ?? 0),
+        mileage: Number(r.mileage ?? 0),
+        notes: r.notes ?? '',
+        status: 'draft',
+      }));
+
+      setRows((prev) => [...prev.filter((r) => r.entry_date !== todayISO), ...clones]);
+      setMsg(`Copied ${clones.length} ${clones.length === 1 ? 'line' : 'lines'} from yesterday to today. Review and edit as needed before saving.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyLastWeekToCurrent() {
+    if (!userId) return;
+    if (!isCurrentWeek) {
+      setMsg('Switch to the current week to copy last week into this week.');
+      return;
+    }
+    if (currentWeekHasEntries) {
+      setMsg('Current week already has entries. Copy last week is only available when the current week is empty.');
+      return;
+    }
+
+    setBusy(true);
+    setMsg('');
+    try {
+      const priorWeekStartISO = toISODate(addDays(weekStart, -7));
+      const priorWeekEndISO = toISODate(addDays(weekStart, -1));
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('entry_date, project_id, time_in, time_out, lunch_hours, mileage, notes')
+        .eq('user_id', userId)
+        .gte('entry_date', priorWeekStartISO)
+        .lte('entry_date', priorWeekEndISO)
+        .order('entry_date', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+
+      const entries = ((data as any[]) ?? []).filter((r) => r.project_id);
+      if (!entries.length) {
+        setMsg('No entries found in last week to copy.');
+        return;
+      }
+
+      const clones: DraftRow[] = entries.map((r) => ({
+        tempId: `tmp_${crypto.randomUUID()}`,
+        entry_date: toISODate(addDays(new Date(`${r.entry_date}T00:00:00`), 7)),
+        project_id: r.project_id,
+        time_in: timeToHHMM(r.time_in),
+        time_out: timeToHHMM(r.time_out),
+        lunch_hours: Number(r.lunch_hours ?? 0),
+        mileage: Number(r.mileage ?? 0),
+        notes: r.notes ?? '',
+        status: 'draft',
+      }));
+
+      setRows((prev) => [...prev.filter((r) => r.entry_date < weekStartISO || r.entry_date > weekEndISO), ...clones]);
+      setMsg('Copied last week into the current week. Review and edit any line before saving or submitting.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveDraft() {
@@ -420,6 +556,17 @@ function SetuTrackInner() {
           </div>
           <div className="muted tsSummaryHint">Tip: Add multiple lines per day. Submitted/approved lines lock.</div>
         </div>
+        <div className="tsQuickFill">
+          <div className="tsQuickFillLabel">Quick fill</div>
+          <div className="tsQuickFillActions">
+            <Button variant="secondary" size="sm" onClick={copyYesterdayToToday} disabled={busy || loadingWeek || !isCurrentWeek}>
+              Copy yesterday → today
+            </Button>
+            <Button variant="secondary" size="sm" onClick={copyLastWeekToCurrent} disabled={busy || loadingWeek || !isCurrentWeek || currentWeekHasEntries}>
+              Copy last week → current
+            </Button>
+          </div>
+        </div>
       </div>
 
       {loadingWeek ? (
@@ -433,10 +580,10 @@ function SetuTrackInner() {
             const dayRows = rows.filter((r) => r.entry_date === dayISO);
 
             return (
-              <section key={dayISO} className="card cardPad tsDayCard">
+              <section key={dayISO} className={`card cardPad tsDayCard ${dayISO === todayISO ? "tsDayCardToday" : ""}`} ref={(node) => { dayRefs.current[dayISO] = node; }}>
                 <div className="tsDayHeader">
                   <div className="tsDayTitle">
-                    {formatShort(day)} <span className="muted">({dayISO})</span>
+                    {formatShort(day)} <span className="muted">({dayISO})</span>{dayISO === todayISO ? <span className="tsTodayBadge">Today</span> : null}
                   </div>
                   <div className="tsDayTotal">Day total: {(hoursByDay[dayISO] ?? 0).toFixed(2)} hrs</div>
                 </div>

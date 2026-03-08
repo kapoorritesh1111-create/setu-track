@@ -8,6 +8,7 @@ type Props = {
   stacked?: boolean;
   showDescription?: boolean;
   href?: string;
+  priority?: boolean;
 };
 
 export default function BrandLockup({
@@ -17,10 +18,21 @@ export default function BrandLockup({
   descriptionClassName = '',
   stacked = true,
   showDescription = false,
+  priority = false,
 }: Props) {
   return (
     <div className={`setuBrandLockup ${stacked ? 'setuBrandLockupStacked' : ''} ${className}`.trim()}>
-      <img className={`setuBrandLogo ${logoClassName}`.trim()} src={BRAND.logo.full} alt={`${BRAND.name} logo`} />
+      <picture>
+        <source srcSet={BRAND.logo.full} type="image/svg+xml" />
+        <img
+          className={`setuBrandLogo ${logoClassName}`.trim()}
+          src={BRAND.logo.fullPng}
+          alt={`${BRAND.name} logo`}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          draggable={false}
+        />
+      </picture>
       <div className="setuBrandCopy">
         <p className={`setuBrandTagline ${taglineClassName}`.trim()}>{BRAND.tagline}</p>
         {showDescription ? (

@@ -172,7 +172,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
             aria-label={`Go to ${BRAND.name} dashboard`}
           >
             <span className="mwHeaderBrandMark mwHeaderBrandMarkIconOnly">
-              <img src={BRAND.logo.mark} alt="" aria-hidden="true" />
+              <img src={BRAND.logo.markPng} alt="" aria-hidden="true" />
             </span>
           </button>
         </div>
@@ -268,6 +268,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
               taglineClassName="mwSidebarBrandTagline"
               descriptionClassName="mwSidebarBrandCaption"
               showDescription
+              priority
             />
           </button>
 

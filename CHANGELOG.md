@@ -27,3 +27,10 @@
 
 ### Notes
 - this pass only corrects the main logo asset and keeps the existing login/sidebar layout intact
+
+## 2026-03-07 — Mobile UX + timesheet productivity
+- Cleaned the shared logo SVG wrappers for sharper mobile rendering and updated shell/header brand image loading.
+- Improved mobile shell, drawer, dashboard header, and timesheet header layouts.
+- Timesheet now defaults to the current week and auto-jumps to today's date.
+- Added quick actions to copy yesterday's entries to today and copy last week into the current week when the current week is empty.
+- New entry form now defaults its date field to today.

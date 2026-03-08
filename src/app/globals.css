@@ -1833,3 +1833,153 @@ html[data-theme="dark"] .setuLoginInput {
     font-size: 11px;
   }
 }
+
+
+/* ---------- 2026-03-07 mobile logo + timesheet enhancements ---------- */
+.setuBrandLockup picture { display: block; }
+.setuBrandLogo {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+}
+.mwHeaderBrandMarkIconOnly img,
+.mwSidebarWordmark,
+.mwSidebarLogoSymbol {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+}
+.tsQuickFill {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(13,32,56,0.08);
+  display: grid;
+  gap: 10px;
+}
+.tsQuickFillLabel {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--setu-muted);
+}
+.tsQuickFillActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.tsDayCardToday {
+  border-color: color-mix(in srgb, var(--setu-indigo-700) 22%, var(--setu-border));
+  box-shadow: 0 16px 36px rgba(15, 111, 229, 0.08);
+}
+.tsDayTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tsTodayBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(34, 199, 184, 0.12);
+  color: var(--setu-teal-700);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+@media (max-width: 920px) {
+  .dbHeaderRight,
+  .tsHeaderRight,
+  .apHeaderRight,
+  .prHeaderRight {
+    width: 100%;
+  }
+  .dbHeaderRight {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dbHeaderRight > *:last-child {
+    grid-column: 1 / -1;
+  }
+  .dbHeaderRight > * {
+    width: 100%;
+    justify-content: center;
+  }
+  .mwHeaderBrandMarkIconOnly {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  .mwHeaderBrandMarkIconOnly img {
+    width: 26px;
+    height: 26px;
+  }
+  .mwDrawer {
+    width: min(86vw, 344px);
+    padding: 18px 16px 24px;
+  }
+  .mwSidebarBrandLockup {
+    gap: 12px;
+  }
+  .mwSidebarWordmark {
+    width: min(176px, 100%);
+  }
+  .mwSidebarBrandTagline {
+    letter-spacing: .16em;
+    font-size: 10px;
+  }
+  .mwSidebarBrandCaption {
+    max-width: 100%;
+    font-size: 13px;
+  }
+}
+@media (max-width: 640px) {
+  .pageHeader {
+    gap: 14px;
+  }
+  .dbHeaderRight,
+  .tsWeekNav,
+  .tsActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+  }
+  .tsWeekNav > :nth-child(3),
+  .tsActions > :nth-child(2) {
+    grid-column: span 1;
+  }
+  .tsWeekNav > *,
+  .tsActions > *,
+  .tsQuickFillActions > * {
+    width: 100%;
+    justify-content: center;
+  }
+  .tsQuickFillActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .tsSummaryValue {
+    font-size: 2.1rem;
+  }
+  .tsSummaryHint {
+    max-width: none;
+  }
+  .tsDayHeader {
+    align-items: stretch;
+  }
+  .tsDayTotal {
+    width: fit-content;
+  }
+  .mwTopInner {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .mwProfileBtn {
+    min-height: 46px;
+    padding-right: 10px;
+  }
+}

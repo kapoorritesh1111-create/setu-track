@@ -93,3 +93,10 @@ For production auth to work correctly, keep Supabase URL configuration aligned w
 4. verify sidebar lockup on authenticated routes
 5. verify the mobile drawer brand lockup
 6. verify dark theme brand contrast
+
+## Latest update: mobile UX and timesheet quick-fill
+
+- Mobile brand assets now use cleaned SVG wrappers with PNG fallbacks for sharper logo rendering in the header, drawer, and shared lockups.
+- The weekly timesheet automatically opens on the current week and scrolls to today's date.
+- Quick-fill actions are available on the weekly timesheet to copy yesterday into today and to copy last week into the current week when that week is still empty.
+- Copied lines remain fully editable until saved or submitted.
