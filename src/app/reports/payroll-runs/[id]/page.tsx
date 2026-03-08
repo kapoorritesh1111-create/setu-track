@@ -1,3 +1,4 @@
+// src/app/reports/payroll-runs/[id]/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -53,22 +54,6 @@ type Line = {
   amount: number;
 };
 
-type Allocation = {
-  project_id: string;
-  project_name: string;
-  hours: number;
-  amount: number;
-};
-
-type ExportHistoryRow = {
-  id: string;
-  export_type: string;
-  file_format: string;
-  exported_at: string;
-  exported_by_name?: string | null;
-  metadata?: any;
-};
-
 function formatMoney(amount: number, currency = "USD") {
   return `${currency} ${Number(amount || 0).toFixed(2)}`;
 }
@@ -80,8 +65,6 @@ export default function PayrollRunDetailPage() {
   const [run, setRun] = useState<Run | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [projectAllocation, setProjectAllocation] = useState<Allocation[]>([]);
-  const [exportHistory, setExportHistory] = useState<ExportHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [savingPaid, setSavingPaid] = useState(false);
@@ -126,14 +109,10 @@ export default function PayrollRunDetailPage() {
       setRun(json.run as Run);
       setLines((json.lines || []) as Line[]);
       setReceipts((json.receipts || json.exports || []) as Receipt[]);
-      setProjectAllocation((json.project_allocation || []) as Allocation[]);
-      setExportHistory((json.export_history || []) as ExportHistoryRow[]);
     } catch (e: any) {
       setRun(null);
       setLines([]);
       setReceipts([]);
-      setProjectAllocation([]);
-      setExportHistory([]);
       setError(e?.message || "Failed to load payroll run.");
     } finally {
       setLoading(false);
@@ -182,13 +161,18 @@ export default function PayrollRunDetailPage() {
               </Button>
             )
           ) : null}
-          <Button onClick={() => setDrawerOpen(true)} disabled={loading || !run} title="Open receipts" variant="secondary">
+          <Button
+            onClick={() => setDrawerOpen(true)}
+            disabled={loading || !run}
+            title="Open receipts"
+            variant="secondary"
+          >
             Receipts
           </Button>
         </div>
       }
     >
-      <div style={{ maxWidth: 1240, display: "grid", gap: 12 }}>
+      <div style={{ maxWidth: 1200 }}>
         {loading ? (
           <div className="card cardPad">
             <div className="muted">Loading…</div>
@@ -232,58 +216,12 @@ export default function PayrollRunDetailPage() {
                     <div className="muted" style={{ fontSize: 12 }}>Contractors</div>
                     <div style={{ fontWeight: 750 }}>{lines.length}</div>
                   </div>
-                  <div>
-                    <div className="muted" style={{ fontSize: 12 }}>Exports</div>
-                    <div style={{ fontWeight: 750 }}>{exportHistory.length}</div>
-                  </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 12 }}>
+            <div style={{ marginTop: 12 }}>
               <DataTable rows={lines} columns={columns} rowKey={(r: Line) => r.id} />
-
-              <div style={{ display: "grid", gap: 12 }}>
-                <div className="card cardPad">
-                  <div style={{ fontWeight: 800, marginBottom: 10 }}>Project allocation</div>
-                  {projectAllocation.length ? (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {projectAllocation.map((row) => (
-                        <div key={row.project_id} className="row" style={{ justifyContent: "space-between", gap: 12 }}>
-                          <div>
-                            <div style={{ fontWeight: 700 }}>{row.project_name}</div>
-                            <div className="muted" style={{ fontSize: 12 }}>{row.hours.toFixed(2)} hrs</div>
-                          </div>
-                          <div style={{ fontWeight: 700 }}>{formatMoney(row.amount, run.currency || "USD")}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">No project allocation available.</div>
-                  )}
-                </div>
-
-                <div className="card cardPad">
-                  <div style={{ fontWeight: 800, marginBottom: 10 }}>Export history ledger</div>
-                  {exportHistory.length ? (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {exportHistory.map((row) => (
-                        <div key={row.id} className="row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-                          <div>
-                            <div style={{ fontWeight: 700 }}>{row.export_type}</div>
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              {new Date(row.exported_at).toLocaleString()} • {row.exported_by_name || "Unknown user"}
-                            </div>
-                          </div>
-                          <StatusChip state="approved" label={String(row.file_format || "file").toUpperCase()} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">No exports recorded yet.</div>
-                  )}
-                </div>
-              </div>
             </div>
 
             <MetaFooter />
@@ -300,15 +238,15 @@ export default function PayrollRunDetailPage() {
               <button
                 key={r.id}
                 className="card cardPad"
+                style={{ textAlign: "left", cursor: "pointer" }}
                 onClick={() => {
                   setSelectedReceipt(r);
                   setReceiptOpen(true);
                 }}
-                style={{ textAlign: "left", cursor: "pointer" }}
               >
-                <div style={{ fontWeight: 700 }}>{r.label || r.type}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {new Date(r.created_at).toLocaleString()} • {r.actor_name || "Unknown user"}
+                <div style={{ fontWeight: 650 }}>{r.label || r.type}</div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {new Date(r.created_at).toLocaleString()}
                 </div>
               </button>
             ))}
@@ -316,7 +254,7 @@ export default function PayrollRunDetailPage() {
         )}
       </Drawer>
 
-      <ExportReceiptDrawer open={receiptOpen} receipt={selectedReceipt as any} onClose={() => setReceiptOpen(false)} />
+      <ExportReceiptDrawer open={receiptOpen} onClose={() => setReceiptOpen(false)} receipt={selectedReceipt as any} />
     </AppShell>
   );
 }

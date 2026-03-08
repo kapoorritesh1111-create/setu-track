@@ -60,8 +60,8 @@ input.input:hover {
 select.input:focus,
 textarea.input:focus,
 input.input:focus {
-  border-color: rgba(34, 199, 184, 0.55);
-  box-shadow: 0 0 0 3px rgba(34, 199, 184, 0.16);
+  border-color: rgba(244, 122, 31, 0.55);
+  box-shadow: 0 0 0 3px rgba(244, 122, 31, 0.16);
 }
 
 select.input {
@@ -142,14 +142,14 @@ html[data-theme="dark"] select.input {
 }
 
 .btnPrimary {
-  background: var(--setu-gradient-main);
-  border-color: transparent;
+  background: var(--setu-saffron-600, #f47a1f);
+  border-color: var(--setu-saffron-600, #f47a1f);
   color: #ffffff;
-  box-shadow: 0 10px 24px rgba(15, 111, 229, 0.24);
 }
 
 .btnPrimary:hover {
-  filter: brightness(1.03);
+  background: #dd6c18;
+  border-color: #dd6c18;
 }
 
 .btnSecondary {

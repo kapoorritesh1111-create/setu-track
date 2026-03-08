@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseBrowser";
 import { useProfile } from "../../lib/useProfile";
-import { Copy, Search } from "lucide-react";
-import DataTable, { Tag } from "../ui/DataTable";
+import { Copy, RefreshCcw, Search, Users } from "lucide-react";
+import { Tag } from "../ui/DataTable";
 import ToolbarBlock from "../ui/ToolbarBlock";
 import { EmptyState } from "../ui/EmptyState";
 import Button from "../ui/Button";
-import WorkspaceKpiStrip from "../setu/WorkspaceKpiStrip";
 
 type Role = "admin" | "manager" | "contractor";
 
@@ -47,6 +46,12 @@ function isUuidLike(s: string) {
   );
 }
 
+function money(rate: number | null) {
+  const value = Number(rate ?? 0);
+  if (!value) return "—";
+  return `$${value.toFixed(0)}/hr`;
+}
+
 export default function PeopleDirectory({
   mode,
 }: {
@@ -60,20 +65,14 @@ export default function PeopleDirectory({
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [msg, setMsg] = useState("");
   const [busyId, setBusyId] = useState<string>("");
-
-  // Selection + menu
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const baselineRef = useRef<Record<string, string>>({});
 
-  // Filters
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [scope, setScope] = useState<ScopeFilter>("visible");
 
-  // (Row actions handled by shared DataTable actions menu)
-
-  // Load org profiles
   useEffect(() => {
     if (!profile?.org_id) return;
 
@@ -96,7 +95,6 @@ export default function PeopleDirectory({
       const list = (data ?? []) as ProfileRow[];
       setRows(list);
 
-      // baseline for dirty detection
       const base: Record<string, string> = {};
       for (const r of list) {
         base[r.id] = JSON.stringify({
@@ -144,78 +142,6 @@ export default function PeopleDirectory({
     baselineRef.current = base;
   }
 
-  const visibleRows = useMemo(() => {
-    if (!profile || !userId) return [];
-
-    // ADMIN Users view = real org directory (admin-only)
-    if (mode === "admin") {
-      if (!isAdmin) return [];
-      return rows;
-    }
-
-    // PEOPLE view = role-based visibility
-    if (scope === "all" && isAdmin) return rows;
-
-    if (isAdmin) return rows;
-
-    if (isManager) {
-      return rows.filter((r) => r.id === userId || r.manager_id === userId);
-    }
-
-    return rows.filter((r) => r.id === userId);
-  }, [rows, profile, userId, scope, isAdmin, isManager, mode]);
-
-  const managers = useMemo(() => {
-    return rows
-      .filter((r) => r.role === "manager" && r.is_active)
-      .sort((a, b) => normalize(a.full_name).localeCompare(normalize(b.full_name)));
-  }, [rows]);
-
-  const filtered = useMemo(() => {
-    const needle = normalize(q);
-    const qIsUuid = isUuidLike(needle);
-
-    return visibleRows.filter((r) => {
-      if (roleFilter !== "all" && r.role !== roleFilter) return false;
-      if (activeFilter === "active" && !r.is_active) return false;
-      if (activeFilter === "inactive" && r.is_active) return false;
-
-      if (!needle) return true;
-
-      const name = normalize(r.full_name);
-      const role = normalize(r.role);
-      const id = normalize(r.id);
-
-      if (qIsUuid) return id.includes(needle);
-      return name.includes(needle) || role.includes(needle) || id.includes(needle);
-    });
-  }, [visibleRows, q, roleFilter, activeFilter]);
-
-  // Remove selection for non-visible rows
-  useEffect(() => {
-    const allowed = new Set(filtered.map((r) => r.id));
-    setSelected((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const k of Object.keys(prev)) {
-        if (allowed.has(k) && prev[k]) next[k] = true;
-      }
-      return next;
-    });
-  }, [filtered]);
-
-  // Derived (NO HOOKS HERE)
-  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
-  const anySelected = selectedIds.length > 0;
-  const allSelected = filtered.length > 0 && filtered.every((r) => selected[r.id]);
-
-  const counts = useMemo(() => {
-    const total = visibleRows.length;
-    const active = visibleRows.filter((r) => r.is_active).length;
-    const inactive = total - active;
-    const showing = filtered.length;
-    return { total, active, inactive, showing };
-  }, [visibleRows, filtered]);
-
   function isDirty(r: ProfileRow) {
     const base = baselineRef.current[r.id] ?? "";
     const cur = JSON.stringify({
@@ -248,9 +174,8 @@ export default function PeopleDirectory({
 
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
-    // update baseline
     const row = rows.find((r) => r.id === id);
-    const merged = { ...(row ?? ({} as any)), ...patch } as ProfileRow;
+    const merged = { ...(row ?? ({} as ProfileRow)), ...patch } as ProfileRow;
     baselineRef.current[id] = JSON.stringify({
       full_name: merged.full_name ?? "",
       role: merged.role,
@@ -268,6 +193,7 @@ export default function PeopleDirectory({
       setMsg("Only Admin can bulk update status.");
       return;
     }
+    const selectedIds = Object.keys(selected).filter((k) => selected[k]);
     if (selectedIds.length === 0) return;
 
     setMsg("");
@@ -307,27 +233,14 @@ export default function PeopleDirectory({
   }
 
   async function copySelectedIds() {
-    if (!anySelected) return;
-    const text = selectedIds.join("\n");
+    const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+    if (!selectedIds.length) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(selectedIds.join("\n"));
       setMsg(`Copied ${selectedIds.length} ID(s) to clipboard.`);
     } catch {
       setMsg("Could not copy to clipboard (browser blocked).");
     }
-  }
-
-  function toggleAll() {
-    setSelected(() => {
-      if (allSelected) return {};
-      const next: Record<string, boolean> = {};
-      for (const r of filtered) next[r.id] = true;
-      return next;
-    });
-  }
-
-  function toggleOne(id: string) {
-    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
   function clearFilters() {
@@ -345,7 +258,6 @@ export default function PeopleDirectory({
     return <div className="card" style={{ padding: 16 }}>Please sign in.</div>;
   }
 
-  // Admin mode is admin-only: show a clean message (no crash)
   if (mode === "admin" && !isAdmin) {
     return (
       <div
@@ -364,27 +276,88 @@ export default function PeopleDirectory({
     );
   }
 
+  let visibleRows = rows;
+  if (mode === "admin") {
+    visibleRows = isAdmin ? rows : [];
+  } else if (!(scope === "all" && isAdmin)) {
+    if (isAdmin) {
+      visibleRows = rows;
+    } else if (isManager) {
+      visibleRows = rows.filter((r) => r.id === userId || r.manager_id === userId);
+    } else {
+      visibleRows = rows.filter((r) => r.id === userId);
+    }
+  }
 
-  const stripItems = useMemo(() => {
-    const managerCount = visibleRows.filter((row) => row.role === "manager").length;
-    const contractorRows = visibleRows.filter((row) => row.role === "contractor");
-    const readyForPayroll = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) > 0).length;
-    const needsAction = contractorRows.filter((row) => row.is_active && Number(row.hourly_rate || 0) <= 0).length;
-    const avgRate = contractorRows.length
-      ? contractorRows.reduce((sum, row) => sum + Number(row.hourly_rate || 0), 0) / contractorRows.length
-      : 0;
-    return [
-      { label: "Active people", value: String(counts.active), hint: `${counts.total} visible in directory` },
-      { label: "Ready for payroll", value: String(readyForPayroll), hint: "Active contractors with hourly rates" },
-      { label: "Needs action", value: String(needsAction), hint: "Active contractors missing rate data" },
-      { label: "Managers", value: String(managerCount), hint: avgRate > 0 ? `Avg contractor rate $${avgRate.toFixed(0)}/hr` : "Rate data appears as profiles are completed" },
-    ];
-  }, [visibleRows, counts]);
+  const managers = rows
+    .filter((r) => r.role === "manager" && r.is_active)
+    .sort((a, b) => normalize(a.full_name).localeCompare(normalize(b.full_name)));
+
+  const managerNameById = new Map<string, string>();
+  for (const m of managers) {
+    managerNameById.set(m.id, m.full_name || m.id);
+  }
+
+  const needle = normalize(q);
+  const qIsUuid = isUuidLike(needle);
+  const filtered = visibleRows.filter((r) => {
+    if (roleFilter !== "all" && r.role !== roleFilter) return false;
+    if (activeFilter === "active" && !r.is_active) return false;
+    if (activeFilter === "inactive" && r.is_active) return false;
+    if (!needle) return true;
+
+    const name = normalize(r.full_name);
+    const role = normalize(r.role);
+    const id = normalize(r.id);
+    return qIsUuid ? id.includes(needle) : name.includes(needle) || role.includes(needle) || id.includes(needle);
+  });
+
+  const filteredIds = new Set(filtered.map((r) => r.id));
+  const selectedIds = Object.keys(selected).filter((k) => selected[k] && filteredIds.has(k));
+  const anySelected = selectedIds.length > 0;
+  const allSelected = filtered.length > 0 && filtered.every((r) => selected[r.id]);
+
+  const counts = {
+    total: visibleRows.length,
+    active: visibleRows.filter((r) => r.is_active).length,
+    inactive: visibleRows.filter((r) => !r.is_active).length,
+    showing: filtered.length,
+  };
+
+  const contractorRows = visibleRows.filter((r) => r.role === "contractor");
+  const managerCount = visibleRows.filter((r) => r.role === "manager").length;
+  const avgRate = contractorRows.length
+    ? contractorRows.reduce((sum, r) => sum + Number(r.hourly_rate ?? 0), 0) / contractorRows.length
+    : 0;
+  const needsAction = contractorRows.filter((r) => r.is_active && !Number(r.hourly_rate ?? 0)).length;
+
+  const stripItems = [
+    {
+      label: "Visible people",
+      value: String(counts.total),
+      hint: mode === "admin" ? "Admin directory scope" : scope === "all" && isAdmin ? "Full org view" : "Role-based visibility",
+    },
+    { label: "Active", value: String(counts.active), hint: `${counts.inactive} inactive` },
+    { label: "Needs action", value: String(needsAction), hint: "Active contractors missing rate data" },
+    { label: "Managers", value: String(managerCount), hint: avgRate > 0 ? `Avg contractor rate $${avgRate.toFixed(0)}/hr` : "Rate data appears as profiles are completed" },
+  ];
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const r of filtered) next[r.id] = true;
+    setSelected(next);
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   return (
     <div className="peopleWrap">
-      <WorkspaceKpiStrip items={stripItems} />
-      {/* Toolbar (shared layout) */}
       <ToolbarBlock
         left={
           <>
@@ -398,26 +371,14 @@ export default function PeopleDirectory({
             </div>
 
             <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <select
-                className="select"
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value as any)}
-                aria-label="Role filter"
-                style={{ width: 160 }}
-              >
+              <select className="select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as Role | "all")} aria-label="Role filter" style={{ width: 160 }}>
                 <option value="all">All roles</option>
                 <option value="admin">Admins</option>
                 <option value="manager">Managers</option>
                 <option value="contractor">Contractors</option>
               </select>
 
-              <select
-                className="select"
-                value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value as any)}
-                aria-label="Status filter"
-                style={{ width: 160 }}
-              >
+              <select className="select" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)} aria-label="Status filter" style={{ width: 160 }}>
                 <option value="all">All status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -427,20 +388,18 @@ export default function PeopleDirectory({
                 <select
                   className="select"
                   value={scope}
-                  onChange={(e) => setScope(e.target.value as any)}
+                  onChange={(e) => setScope(e.target.value as ScopeFilter)}
                   aria-label="Scope filter"
                   disabled={!isAdmin}
                   title={!isAdmin ? "Admin only" : ""}
-                  style={{ width: 160 }}
+                  style={{ width: 170 }}
                 >
                   <option value="visible">Visible</option>
                   <option value="all">All org (admin)</option>
                 </select>
               ) : null}
 
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear
-              </Button>
+              <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
             </div>
           </>
         }
@@ -450,50 +409,38 @@ export default function PeopleDirectory({
             <Tag tone="success">Active: {counts.active}</Tag>
             <Tag tone="warn">Inactive: {counts.inactive}</Tag>
             <Tag tone="default">Showing: {counts.showing}</Tag>
-            <Button onClick={reload}>Refresh</Button>
+            <Button onClick={reload} icon={<RefreshCcw size={16} />}>Refresh</Button>
           </>
         }
         message={msg ? <span>{msg}</span> : null}
       />
 
-      {/* Bulk bar */}
-      {anySelected && (
-        <div className="peopleBulk card">
-          <div className="row" style={{ gap: 10, alignItems: "center" }}>
-            <Tag tone="default">{selectedIds.length} selected</Tag>
-
-            <Button onClick={copySelectedIds}>
-              <Copy size={16} style={{ marginRight: 8 }} />
-              Copy IDs
-            </Button>
-
-            {isAdmin && (
-              <>
-                <Button disabled={busyId === "bulk"} onClick={() => bulkSetActive(true)}>
-                  Activate
-                </Button>
-                <Button disabled={busyId === "bulk"} onClick={() => bulkSetActive(false)}>
-                  Deactivate
-                </Button>
-              </>
-            )}
-
-            <Button variant="ghost" onClick={() => setSelected({})}>
-              Clear selection
-            </Button>
+      <div className="metricsRow" style={{ marginBottom: 14 }}>
+        {stripItems.map((item) => (
+          <div key={item.label} className="statCard">
+            <div className="statLabel">{item.label}</div>
+            <div className="statValue">{item.value}</div>
+            <div className="statHint">{item.hint}</div>
           </div>
+        ))}
+      </div>
 
-          {busyId === "bulk" && (
-            <div className="muted" style={{ marginTop: 8 }}>
-              Applying bulk update…
-            </div>
-          )}
+      {anySelected ? (
+        <div className="peopleBulk card cardPad" style={{ marginBottom: 12 }}>
+          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Tag tone="default">{selectedIds.length} selected</Tag>
+            <Button onClick={copySelectedIds} icon={<Copy size={16} />}>Copy IDs</Button>
+            {isAdmin ? (
+              <>
+                <Button disabled={busyId === "bulk"} onClick={() => bulkSetActive(true)}>Activate</Button>
+                <Button disabled={busyId === "bulk"} onClick={() => bulkSetActive(false)}>Deactivate</Button>
+              </>
+            ) : null}
+            <Button variant="ghost" onClick={() => setSelected({})}>Clear selection</Button>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Messages now shown in toolbar */}
-
-      {/* Table */}
       {visibleRows.length === 0 ? (
         <div className="card cardPad">
           <EmptyState
@@ -519,232 +466,202 @@ export default function PeopleDirectory({
           <EmptyState
             title="No users found"
             description="Try adjusting search or clearing filters."
-            action={
-              <Button variant="ghost" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            }
+            action={<Button variant="ghost" onClick={clearFilters}>Clear filters</Button>}
           />
         </div>
       ) : (
-        <DataTable
-        rows={filtered}
-        rowKey={(r) => r.id}
-        loading={false}
-        columns={[
-          {
-            key: "sel",
-            header: (
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
-            ),
-            width: 36,
-            align: "center",
-            cell: (r) => (
-              <input
-                type="checkbox"
-                checked={!!selected[r.id]}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  toggleOne(r.id);
-                }}
-                aria-label={`Select ${r.full_name ?? r.id}`}
-              />
-            ),
-          },
-          {
-            key: "name",
-            header: "Name",
-            cell: (r) => {
-              const dirty = isDirty(r);
-              const canEditSelfName = r.id === userId;
-              const canAdminEdit = isAdmin;
-              const canManagerEditReport = isManager && r.manager_id === userId;
-              const canEditName = canAdminEdit || canEditSelfName || canManagerEditReport;
+        <div className="card">
+          <div className="tableWrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 42, textAlign: "center" }}>
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
+                  </th>
+                  <th>Name</th>
+                  <th style={{ width: 140 }}>Role</th>
+                  <th style={{ width: 210 }}>Manager</th>
+                  <th style={{ width: 120, textAlign: "right" }}>Rate</th>
+                  <th style={{ width: 130 }}>Status</th>
+                  <th style={{ width: 130 }}>Joined</th>
+                  <th style={{ width: 120, textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r) => {
+                  const dirty = isDirty(r);
+                  const canEditSelfName = r.id === userId;
+                  const canAdminEdit = isAdmin;
+                  const canManagerEditReport = isManager && r.manager_id === userId;
+                  const canEditName = canAdminEdit || canEditSelfName || canManagerEditReport;
+                  const canEditRole = isAdmin;
+                  const canEditManager = isAdmin;
+                  const canEditRate = isAdmin || canManagerEditReport;
+                  const canEditStatus = isAdmin;
 
-              return (
-                <div style={{ display: "grid", gap: 6 }}>
-                  {canEditName ? (
-                    <input
-                      className="input"
-                      value={r.full_name ?? ""}
-                      placeholder="Full name"
-                      onChange={(e) =>
-                        setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, full_name: e.target.value } : x)))
-                      }
-                      onBlur={() => {
-                        if (!dirty) return;
-                        saveRow(r.id, { full_name: r.full_name ?? "" });
-                      }}
-                    />
-                  ) : (
-                    <div style={{ fontWeight: 850 }}>{r.full_name ?? "—"}</div>
-                  )}
-                  <div className="muted mono" style={{ fontSize: 12 }}>
-                    {r.id}
-                  </div>
-                </div>
-              );
-            },
-          },
-          {
-            key: "role",
-            header: "Role",
-            width: 140,
-            cell: (r) => {
-              const dirty = isDirty(r);
-              const canEditRole = isAdmin;
-
-              return (
-                <select
-                  className="input"
-                  value={r.role}
-                  disabled={!canEditRole}
-                  title={!canEditRole ? "Admin only" : ""}
-                  onChange={(e) => {
-                    const role = e.target.value as Role;
-                    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, role } : x)));
-                  }}
-                  onBlur={() => {
-                    if (!dirty) return;
-                    if (canEditRole) saveRow(r.id, { role: r.role });
-                  }}
-                >
-                  <option value="admin">admin</option>
-                  <option value="manager">manager</option>
-                  <option value="contractor">contractor</option>
-                </select>
-              );
-            },
-          },
-          {
-            key: "manager",
-            header: "Manager",
-            width: 200,
-            cell: (r) => {
-              const dirty = isDirty(r);
-              const canEditManager = isAdmin;
-
-              return (
-                <select
-                  className="input"
-                  value={r.manager_id ?? ""}
-                  disabled={!canEditManager}
-                  title={!canEditManager ? "Admin only" : ""}
-                  onChange={(e) => {
-                    const manager_id = e.target.value || null;
-                    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, manager_id } : x)));
-                  }}
-                  onBlur={() => {
-                    if (!dirty) return;
-                    if (canEditManager) saveRow(r.id, { manager_id: r.manager_id });
-                  }}
-                >
-                  <option value="">—</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.full_name ?? m.id}
-                    </option>
-                  ))}
-                </select>
-              );
-            },
-          },
-          {
-            key: "rate",
-            header: "Rate",
-            width: 120,
-            align: "right",
-            cell: (r) => {
-              const dirty = isDirty(r);
-              const canManagerEditReport = isManager && r.manager_id === userId;
-              const canEditRate = isAdmin || canManagerEditReport;
-
-              return (
-                <input
-                  className="input"
-                  type="number"
-                  value={r.hourly_rate ?? 0}
-                  disabled={!canEditRate}
-                  title={!canEditRate ? "Admin only / your direct report" : ""}
-                  onChange={(e) => {
-                    const hourly_rate = Number(e.target.value);
-                    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, hourly_rate } : x)));
-                  }}
-                  onBlur={() => {
-                    if (!dirty) return;
-                    if (canEditRate) saveRow(r.id, { hourly_rate: r.hourly_rate ?? 0 });
-                  }}
-                />
-              );
-            },
-          },
-          {
-            key: "status",
-            header: "Status",
-            width: 130,
-            cell: (r) => {
-              const dirty = isDirty(r);
-              const canEditStatus = isAdmin;
-              if (canEditStatus) {
-                return (
-                  <select
-                    className="input"
-                    value={r.is_active ? "active" : "inactive"}
-                    onChange={(e) => {
-                      const is_active = e.target.value === "active";
-                      setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, is_active } : x)));
-                    }}
-                    onBlur={() => {
-                      if (!dirty) return;
-                      saveRow(r.id, { is_active: r.is_active });
-                    }}
-                  >
-                    <option value="active">active</option>
-                    <option value="inactive">inactive</option>
-                  </select>
-                );
-              }
-              return <Tag tone={r.is_active ? "success" : "warn"}>{r.is_active ? "Active" : "Inactive"}</Tag>;
-            },
-          },
-          {
-            key: "joined",
-            header: "Joined",
-            width: 130,
-            cell: (r) => fmtDate(r.created_at),
-          },
-        ]}
-        actions={(r) => {
-          const dirty = isDirty(r);
-          const items: any[] = [];
-          if (dirty) {
-            items.push({
-              label: busyId === r.id ? "Saving…" : "Save",
-              disabled: busyId === r.id,
-              onSelect: async () =>
-                saveRow(r.id, {
-                  full_name: r.full_name ?? "",
-                  role: r.role,
-                  hourly_rate: r.hourly_rate ?? 0,
-                  is_active: r.is_active,
-                  manager_id: r.manager_id,
-                }),
-            });
-          }
-          items.push({
-            label: "Copy user ID",
-            onSelect: async () => {
-              try {
-                await navigator.clipboard.writeText(r.id);
-                setMsg("Copied user ID.");
-              } catch {
-                setMsg("Could not copy user ID.");
-              }
-            },
-          });
-          return items;
-        }}
-        />
+                  return (
+                    <tr key={r.id}>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={!!selected[r.id]}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleOne(r.id);
+                          }}
+                          aria-label={`Select ${r.full_name ?? r.id}`}
+                        />
+                      </td>
+                      <td>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {canEditName ? (
+                            <input
+                              className="input"
+                              value={r.full_name ?? ""}
+                              placeholder="Full name"
+                              onChange={(e) =>
+                                setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, full_name: e.target.value } : x)))
+                              }
+                              onBlur={() => {
+                                if (!dirty) return;
+                                void saveRow(r.id, { full_name: r.full_name ?? "" });
+                              }}
+                            />
+                          ) : (
+                            <div style={{ fontWeight: 850 }}>{r.full_name ?? "—"}</div>
+                          )}
+                          <div className="muted mono" style={{ fontSize: 12 }}>{r.id}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <select
+                          className="input"
+                          value={r.role}
+                          disabled={!canEditRole}
+                          title={!canEditRole ? "Admin only" : ""}
+                          onChange={(e) => {
+                            const role = e.target.value as Role;
+                            setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, role } : x)));
+                          }}
+                          onBlur={() => {
+                            if (!dirty || !canEditRole) return;
+                            void saveRow(r.id, { role: r.role });
+                          }}
+                        >
+                          <option value="admin">admin</option>
+                          <option value="manager">manager</option>
+                          <option value="contractor">contractor</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="input"
+                          value={r.manager_id ?? ""}
+                          disabled={!canEditManager}
+                          title={!canEditManager ? "Admin only" : ""}
+                          onChange={(e) => {
+                            const manager_id = e.target.value || null;
+                            setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, manager_id } : x)));
+                          }}
+                          onBlur={() => {
+                            if (!dirty || !canEditManager) return;
+                            void saveRow(r.id, { manager_id: r.manager_id });
+                          }}
+                        >
+                          <option value="">—</option>
+                          {managers.map((m) => (
+                            <option key={m.id} value={m.id}>{m.full_name ?? m.id}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <input
+                          className="input"
+                          type="number"
+                          value={r.hourly_rate ?? 0}
+                          disabled={!canEditRate}
+                          title={!canEditRate ? "Admin only / your direct report" : ""}
+                          onChange={(e) => {
+                            const hourly_rate = Number(e.target.value);
+                            setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, hourly_rate } : x)));
+                          }}
+                          onBlur={() => {
+                            if (!dirty || !canEditRate) return;
+                            void saveRow(r.id, { hourly_rate: r.hourly_rate ?? 0 });
+                          }}
+                        />
+                      </td>
+                      <td>
+                        {canEditStatus ? (
+                          <select
+                            className="input"
+                            value={r.is_active ? "active" : "inactive"}
+                            onChange={(e) => {
+                              const is_active = e.target.value === "active";
+                              setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, is_active } : x)));
+                            }}
+                            onBlur={() => {
+                              if (!dirty) return;
+                              void saveRow(r.id, { is_active: r.is_active });
+                            }}
+                          >
+                            <option value="active">active</option>
+                            <option value="inactive">inactive</option>
+                          </select>
+                        ) : (
+                          <Tag tone={r.is_active ? "success" : "warn"}>{r.is_active ? "Active" : "Inactive"}</Tag>
+                        )}
+                      </td>
+                      <td>{fmtDate(r.created_at)}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!dirty || busyId === r.id}
+                            onClick={() =>
+                              void saveRow(r.id, {
+                                full_name: r.full_name ?? "",
+                                role: r.role,
+                                hourly_rate: r.hourly_rate ?? 0,
+                                is_active: r.is_active,
+                                manager_id: r.manager_id,
+                              })
+                            }
+                          >
+                            {busyId === r.id ? "Saving…" : dirty ? "Save" : "Saved"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(r.id);
+                                setMsg("Copied user ID.");
+                              } catch {
+                                setMsg("Could not copy user ID.");
+                              }
+                            }}
+                          >
+                            Copy ID
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="cardPad" style={{ borderTop: "1px solid var(--line)", display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div className="muted">
+              {counts.showing} showing • {contractorRows.length} contractors • {managerCount} managers
+            </div>
+            <div className="muted">
+              Avg contractor rate: {money(avgRate)} {needsAction ? `• ${needsAction} need rate setup` : ""}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

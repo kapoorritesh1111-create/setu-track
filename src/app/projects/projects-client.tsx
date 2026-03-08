@@ -14,7 +14,6 @@ import Button from "../../components/ui/Button";
 import ActionMenu from "../../components/ui/ActionMenu";
 import SavedViews from "../../components/ui/SavedViews";
 import { Search } from "lucide-react";
-import WorkspaceKpiStrip from "../../components/setu/WorkspaceKpiStrip";
 
 type WeekStart = "sunday" | "monday";
 type ActiveFilter = "all" | "active" | "inactive";
@@ -630,28 +629,7 @@ function closeCreate() {
     if (isAdmin) openDrawer(projectId);
   }
 
-  const subtitle = manageUser
-    ? `Managing project access for ${manageUser.full_name || manageUser.id}`
-    : isAdmin
-      ? "Admin view (org projects)"
-      : isManagerOrAdmin
-        ? "Manager view (org projects)"
-        : "Your assigned projects";
-
-  const stripItems = useMemo(() => {
-    const mondayCount = projects.filter((project) => (project.week_start || "sunday") === "monday").length;
-    const assignedCount = manageUserId ? filteredProjects.filter((project) => assignedProjectIds.has(project.id)).length : filteredProjects.length;
-    return [
-      { label: "Active projects", value: String(counts.active), hint: `${counts.total} visible in org scope` },
-      { label: "Inactive", value: String(counts.inactive), hint: "Archived or paused workspaces" },
-      { label: manageUserId ? "Assigned to user" : "Filtered view", value: String(assignedCount), hint: manageUserId ? "Current access granted" : "Projects in current filter" },
-      { label: "Week start Monday", value: String(mondayCount), hint: "Delivery configuration coverage" },
-    ];
-  }, [projects, filteredProjects, counts, manageUserId, assignedProjectIds]);
-
-
-
-  // ---- AppShell early returns (must come after every hook declaration) ----
+  // ---- AppShell early returns (must include children!) ----
   if (loading) {
     return (
       <AppShell title="Projects" subtitle="Loading…">
@@ -677,6 +655,14 @@ function closeCreate() {
     );
   }
 
+  const subtitle = manageUser
+    ? `Managing project access for ${manageUser.full_name || manageUser.id}`
+    : isAdmin
+      ? "Admin view (org projects)"
+      : isManagerOrAdmin
+        ? "Manager view (org projects)"
+        : "Your assigned projects";
+
   const headerRight = (
     <div className="prHeaderRight">
       <span className="badge">{counts.active} active</span>
@@ -693,8 +679,6 @@ function closeCreate() {
           <div style={{ marginTop: 6 }}>{fetchErr}</div>
         </div>
       ) : null}
-
-      <WorkspaceKpiStrip items={stripItems} />
 
       {/* Admin: create project moved into Drawer for Monday-style UX */}
 

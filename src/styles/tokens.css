@@ -1,52 +1,37 @@
 :root {
-  --setu-navy-950: #071a33;
-  --setu-navy-900: #0b2647;
-  --setu-navy-800: #10345f;
-  --setu-blue-700: #1f6fe5;
-  --setu-teal-500: #22c7b8;
-  --setu-teal-400: #39ddd0;
-  --setu-cyan-300: #79e8f2;
+  --setu-indigo-900: #0F1A2E;
+  --setu-indigo-800: #162447;
+  --setu-indigo-700: #243B6B;
+  --setu-saffron-600: #F47A1F;
 
-  --setu-indigo-900: var(--setu-navy-900);
-  --setu-indigo-800: var(--setu-navy-800);
-  --setu-indigo-700: #1a4d85;
-  --setu-saffron-600: var(--setu-teal-500);
+  --setu-bg: #F5F7FC;
+  --setu-surface: #FFFFFF;
+  --setu-sand: #F5EFE6;
+  --setu-text: #0F1A2E;
+  --setu-muted: #6B7280;
+  --setu-border: #E5E7EB;
 
-  --setu-bg: #f4f8fc;
-  --setu-surface: #ffffff;
-  --setu-surface-2: #f8fbff;
-  --setu-text: #0d2038;
-  --setu-muted: #64748b;
-  --setu-border: rgba(13, 32, 56, 0.10);
+  --setu-success: #16A34A;
+  --setu-warning: #F59E0B;
+  --setu-danger: #DC2626;
+  --setu-info: #2563EB;
 
-  --setu-success: #14b86d;
-  --setu-warning: #f59e0b;
-  --setu-danger: #ef4444;
-  --setu-info: #2563eb;
-
-  --setu-gradient-main: linear-gradient(135deg, #0c2d58 0%, #1570ef 46%, #22c7b8 100%);
-  --setu-gradient-soft: linear-gradient(135deg, rgba(12,45,88,0.06) 0%, rgba(34,199,184,0.12) 100%);
-  --setu-gradient-dark: linear-gradient(180deg, #0a2341 0%, #071a33 100%);
-
-  --radius-card: 20px;
-  --radius-control: 14px;
-  --shadow-card: 0 16px 40px rgba(7, 26, 51, 0.08);
-  --shadow-soft: 0 10px 24px rgba(12, 45, 88, 0.08);
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --shadow-card: 0 8px 20px rgba(0,0,0,0.08);
 
   --row-h: 44px;
   --header-h: 84px;
-  --sidebar-w: 280px;
+  --sidebar-w: 270px;
 
-  --focus: 0 0 0 3px rgba(34, 199, 184, 0.22);
+  --focus: 0 0 0 3px rgba(244, 122, 31, 0.28);
 }
 
 :root[data-theme="dark"] {
-  --setu-bg: #071a33;
-  --setu-surface: #0c2341;
-  --setu-surface-2: #102b4d;
-  --setu-text: #edf6ff;
-  --setu-muted: #a8bfd8;
+  --setu-bg: #0F1A2E;
+  --setu-surface: #162447;
+  --setu-text: #F3F4F6;
+  --setu-muted: #C7CBD1;
   --setu-border: rgba(255,255,255,0.10);
-  --shadow-card: 0 18px 48px rgba(0,0,0,0.40);
-  --shadow-soft: 0 12px 32px rgba(0,0,0,0.26);
+  --shadow-card: 0 10px 26px rgba(0,0,0,0.40);
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function NewEntry(){
   const router = useRouter();
-  const [date,setDate]=useState(new Date().toISOString().slice(0,10));
+  const [date,setDate]=useState('');
   const [timeIn,setTimeIn]=useState('09:00');
   const [timeOut,setTimeOut]=useState('17:00');
 
@@ -31,7 +31,7 @@ export default function NewEntry(){
   return (
     <form onSubmit={save}>
       <h2>New Entry</h2>
-      <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+      <input type="date" onChange={e=>setDate(e.target.value)} />
       <input type="time" value={timeIn} onChange={e=>setTimeIn(e.target.value)} />
       <input type="time" value={timeOut} onChange={e=>setTimeOut(e.target.value)} />
       <button>Save</button>

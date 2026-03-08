@@ -21,7 +21,7 @@ export type ExportEventInput = {
 export async function logExportEvent(input: ExportEventInput) {
   try {
     const supa = supabaseService();
-    const { data: event } = await supa.from("export_events").insert({
+    await supa.from("export_events").insert({
       org_id: input.org_id,
       run_id: input.run_id ?? null,
       project_export_id: input.project_export_id ?? null,
@@ -34,24 +34,6 @@ export async function logExportEvent(input: ExportEventInput) {
       period_start: input.period_start,
       period_end: input.period_end,
       metadata: input.metadata ?? {},
-    }).select("id").maybeSingle();
-
-    await supa.from("export_history").insert({
-      org_id: input.org_id,
-      payroll_run_id: input.run_id ?? null,
-      export_event_id: (event as any)?.id ?? null,
-      project_export_id: input.project_export_id ?? null,
-      export_type: input.export_type,
-      file_format: input.file_format,
-      exported_by: input.actor_id,
-      exported_by_name: input.actor_name_snapshot ?? null,
-      metadata: {
-        ...(input.metadata ?? {}),
-        period_start: input.period_start,
-        period_end: input.period_end,
-        scope: input.scope,
-        project_id: input.project_id ?? null,
-      },
     });
   } catch {
     // Intentionally swallow errors.

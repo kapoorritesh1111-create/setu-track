@@ -214,20 +214,10 @@ export default function PayrollReportPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, periodScope, projectId, personId, paymentStatus, exportStatus, view, query, start, end]);
+  }, [preset, periodScope, projectId, personId, paymentStatus, exportStatus, view]);
 
   const trendMax = useMemo(() => {
     return Math.max(1, ...(payload?.trend || []).map((point) => point.amount));
-  }, [payload]);
-
-  const executiveSummary = useMemo(() => {
-    const register = payload?.register || [];
-    return {
-      paidRows: register.filter((row) => row.is_paid).length,
-      awaitingPayment: register.filter((row) => row.payment_status === "awaiting_payment").length,
-      awaitingExport: register.filter((row) => row.export_status === "not_generated" || row.payment_status === "awaiting_export").length,
-      receiptsLinked: register.reduce((sum, row) => sum + Number(row.receipt_count || 0), 0),
-    };
   }, [payload]);
 
   async function togglePaid(row: RegisterRow, nextPaid: boolean) {
@@ -288,28 +278,6 @@ export default function PayrollReportPage() {
       right={headerRight}
     >
       <div className="setuReportPage">
-        <div className="setuCompareGrid" style={{ marginBottom: 12 }}>
-          <div className="setuCompareCard setuCompareCardPrimary">
-            <div className="setuCompareLabel">Rows paid</div>
-            <div className="setuCompareValue">{executiveSummary.paidRows}</div>
-            <div className="setuCompareMeta">Payroll rows already settled in this view</div>
-          </div>
-          <div className="setuCompareCard">
-            <div className="setuCompareLabel">Awaiting payment</div>
-            <div className="setuCompareValue">{executiveSummary.awaitingPayment}</div>
-            <div className="setuCompareMeta">Ready to move from export into payment</div>
-          </div>
-          <div className="setuCompareCard">
-            <div className="setuCompareLabel">Awaiting export</div>
-            <div className="setuCompareValue">{executiveSummary.awaitingExport}</div>
-            <div className="setuCompareMeta">Needs client export or receipt creation</div>
-          </div>
-          <div className="setuCompareCard">
-            <div className="setuCompareLabel">Linked receipts</div>
-            <div className="setuCompareValue">{executiveSummary.receiptsLinked}</div>
-            <div className="setuCompareMeta">Receipt records connected to current payroll rows</div>
-          </div>
-        </div>
         <div className="setuFilterBar">
           <div className="setuFilterGrid">
             <label className="setuField">

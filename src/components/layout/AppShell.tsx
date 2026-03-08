@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseBrowser";
 import { useProfile } from "../../lib/useProfile";
-import BrandLockup from "../brand/BrandLockup";
 import {
   LayoutDashboard,
   Clock3,
@@ -21,7 +20,6 @@ import {
   FileText,
   CreditCard,
   Building2,
-  BarChart3,
 } from "lucide-react";
 
 type Props = {
@@ -64,13 +62,13 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
 
   const role = profile?.role || "user";
   const fullName = profile?.full_name || "User";
-  const orgName = profile?.org_name || "Workspace";
+  const orgName = profile?.org_name || "SETU TRACK";
   const isAdmin = role === "admin";
 
   const navItems: NavItem[] = useMemo(
     () =>
       [
-        { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard size={16} /> },
+        { label: "Home", href: "/dashboard", icon: <LayoutDashboard size={16} /> },
         { label: "My work", href: "/timesheet", icon: <Clock3 size={16} /> },
         {
           label: "Approvals",
@@ -98,19 +96,13 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
           hideIf: (r: string) => r !== "admin",
         },
         {
-          label: "Analytics",
-          href: "/analytics",
-          icon: <BarChart3 size={16} />,
-          hideIf: (r: string) => r === "contractor",
-        },
-        {
           label: "Exports",
           href: "/admin/exports",
           icon: <Shield size={16} />,
           hideIf: (r: string) => r !== "admin",
         },
         {
-          label: "Admin settings",
+          label: "Org Settings",
           href: "/admin/org-settings",
           icon: <Building2 size={16} />,
           hideIf: (r: string) => r !== "admin",
@@ -169,20 +161,23 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
             <Menu size={18} />
           </button>
 
-          <button type="button" className="mwBrandButton mwDesktopHidden mwHeaderBrand" onClick={() => go("/dashboard")} aria-label="Go to dashboard">
-            <BrandLockup iconOnly compact className="mwHeaderBrandLockup" />
+          <button
+            type="button"
+            className="mwBrandButton mwDesktopHidden mwHeaderBrand"
+            onClick={() => go("/dashboard")}
+            aria-label="Go to dashboard"
+          >
+            <span className="mwHeaderBrandMark">
+              <img src="/brand/setu-knot-icon.svg" alt="" aria-hidden="true" />
+            </span>
+            <span className="mwHeaderBrandText">
+              <span className="mwHeaderBrandTitle">SETU TRACK</span>
+            </span>
           </button>
         </div>
 
         <div className="mwTopRight" ref={menuRef}>
-          <button
-            type="button"
-            className="mwProfileBtn"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label="Open account menu"
-          >
+          <button type="button" className="mwProfileBtn" onClick={() => setMenuOpen((v) => !v)}>
             <span className="mwAvatar">{initials(fullName)}</span>
 
             <span className="mwProfileMeta">
@@ -263,11 +258,19 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
             className="mwSidebarBrandBtn mwSidebarBrandHero"
             onClick={() => go("/dashboard")}
             aria-label="Go to dashboard"
->
-            <span className="mwSidebarLogoCard"><BrandLockup className="mwSidebarLockup" showTagline={false} /></span>
+          >
+            <span className="mwSidebarBrandMark">
+              <img
+                className="mwSidebarKnot"
+                src="/brand/setu-knot-icon.svg"
+                alt=""
+                aria-hidden="true"
+              />
+            </span>
             <span className="mwSidebarBrandCopy">
-              <span className="mwSidebarEyebrow">CONNECT . TRACK . GROW</span>
-              <span className="mwSidebarBrandCaption">Contractor operations, payroll intelligence, and analytics</span>
+              <span className="mwSidebarEyebrow">SETU GROUP</span>
+              <span className="mwSidebarBrandTitle">SETU TRACK</span>
+              <span className="mwSidebarBrandCaption">Time, payroll, and export operations</span>
             </span>
           </button>
 
@@ -303,11 +306,14 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
                 className="mwSidebarBrandBtn mwSidebarBrandHero"
                 onClick={() => go("/dashboard")}
                 aria-label="Go to dashboard"
->
-                <span className="mwSidebarLogoCard"><BrandLockup className="mwSidebarLockup" showTagline={false} /></span>
+              >
+                <span className="mwSidebarBrandMark">
+                  <img className="mwSidebarKnot" src="/brand/setu-knot-icon.svg" alt="" aria-hidden="true" />
+                </span>
                 <span className="mwSidebarBrandCopy">
-                  <span className="mwSidebarEyebrow">CONNECT . TRACK . GROW</span>
-                  <span className="mwSidebarBrandCaption">Contractor operations, payroll intelligence, and analytics</span>
+                  <span className="mwSidebarEyebrow">SETU GROUP</span>
+                  <span className="mwSidebarBrandTitle">SETU TRACK</span>
+                  <span className="mwSidebarBrandCaption">Time, payroll, and export operations</span>
                 </span>
               </button>
 
@@ -393,7 +399,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
         </div>
       )}
 
-      <main id="main-content" className="container">
+      <main className="container">
         {(title || subtitle || right) && (
           <div className="pageHeader">
             <div>

@@ -1,7 +1,7 @@
 // src/app/timesheet/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import RequireOnboarding from "../../components/auth/RequireOnboarding";
 import AppShell from "../../components/layout/AppShell";
 import { supabase } from "../../lib/supabaseBrowser";
@@ -60,41 +60,6 @@ function normalizeHHMM(s: string): string {
   return `${h}:${m}`;
 }
 
-
-function isoToday() {
-  return toISODate(new Date());
-}
-
-function cloneRowForDate(r: DraftRow, entry_date: string): DraftRow {
-  return {
-    tempId: `tmp_${crypto.randomUUID()}`,
-    entry_date,
-    project_id: r.project_id,
-    time_in: r.time_in,
-    time_out: r.time_out,
-    lunch_hours: Number(r.lunch_hours ?? 0),
-    mileage: Number(r.mileage ?? 0),
-    notes: r.notes ?? "",
-    status: "draft",
-    rejection_reason: null,
-  };
-}
-
-function rowMinutes(r: DraftRow) {
-  if (!r.time_in || !r.time_out) return 0;
-  const [h1,m1]=normalizeHHMM(r.time_in).split(':').map(Number);
-  const [h2,m2]=normalizeHHMM(r.time_out).split(':').map(Number);
-  if ([h1,m1,h2,m2].some((n)=>Number.isNaN(n))) return 0;
-  return h2*60+m2 - (h1*60+m1);
-}
-
-function validateRow(r: DraftRow) {
-  if (!r.project_id) return 'Project required';
-  if (!!r.time_in !== !!r.time_out) return 'Start and end time required';
-  if (r.time_in && r.time_out && rowMinutes(r) <= 0) return 'End time must be after start time';
-  return '';
-}
-
 function StatusPill({ status }: { status: EntryStatus | undefined }) {
   const s = (status ?? "draft") as EntryStatus;
   return <StatusChip status={s} />;
@@ -113,8 +78,6 @@ function SetuTrackInner() {
   const [msg, setMsg] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
-  const todayRef = useRef<HTMLElement | null>(null);
-  const [templateName, setTemplateName] = useState("Standard week");
 
   const canView = !!userId && !!profile;
   const isManagerOrAdmin = profile?.role === "admin" || profile?.role === "manager";
@@ -239,115 +202,6 @@ function SetuTrackInner() {
   }, [rows, weekDays]);
 
   const weekTotal = useMemo(() => Object.values(hoursByDay).reduce((a, b) => a + b, 0), [hoursByDay]);
-  const todayISO = isoToday();
-  const isCurrentWeek = todayISO >= weekStartISO && todayISO <= weekEndISO;
-  const submittedWeek = useMemo(() => rows.length > 0 && rows.every((r) => r.status === "submitted" || r.status === "approved"), [rows]);
-  const validationMap = useMemo(() => Object.fromEntries(rows.map((r)=>[r.tempId, validateRow(r)])), [rows]);
-
-  useEffect(() => {
-    if (!isCurrentWeek || loadingWeek) return;
-    const node = todayRef.current;
-    if (node) node.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [isCurrentWeek, loadingWeek, weekStartISO, weekEndISO]);
-
-  function hasEntriesFor(dateISO: string) {
-    return rows.some((r) => r.entry_date === dateISO);
-  }
-
-  function copyYesterdayToToday() {
-    const y = toISODate(addDays(new Date(todayISO + 'T00:00:00'), -1));
-    const yesterdayRows = rows.filter((r) => r.entry_date === y);
-    if (!isCurrentWeek) return setMsg('Open the current week to copy into today.');
-    if (hasEntriesFor(todayISO)) return setMsg('Today already has entries. Edit existing lines instead.');
-    if (!yesterdayRows.length) return setMsg('No entries found for yesterday.');
-    setRows((prev) => [...prev, ...yesterdayRows.map((r) => cloneRowForDate(r, todayISO))]);
-    setMsg('Copied yesterday → today.');
-  }
-
-  async function copyLastWeekToCurrent() {
-    if (!isCurrentWeek) return setMsg('Open the current week to copy last week into it.');
-    if (rows.length) return setMsg('Current week must be empty before copying last week.');
-    const lastWeekStart = addDays(weekStart, -7);
-    const lastStartISO = toISODate(lastWeekStart);
-    const lastEndISO = toISODate(addDays(lastWeekStart, 6));
-    setBusy(true);
-    try {
-      const { data, error } = await supabase
-        .from('time_entries')
-        .select('entry_date, project_id, time_in, time_out, lunch_hours, mileage, notes')
-        .eq('user_id', userId!)
-        .gte('entry_date', lastStartISO)
-        .lte('entry_date', lastEndISO)
-        .order('entry_date', { ascending: true });
-
-      if (error) {
-        setMsg(error.message);
-        return;
-      }
-
-      const copied = ((data || []) as any[]).map((r) => {
-        const offset = Math.max(0, Math.round((new Date(r.entry_date + 'T00:00:00').getTime() - new Date(lastStartISO + 'T00:00:00').getTime()) / 86400000));
-        return cloneRowForDate({
-          tempId: '',
-          entry_date: r.entry_date,
-          project_id: r.project_id,
-          time_in: timeToHHMM(r.time_in),
-          time_out: timeToHHMM(r.time_out),
-          lunch_hours: Number(r.lunch_hours || 0),
-          mileage: Number(r.mileage || 0),
-          notes: r.notes || '',
-          status: 'draft',
-        }, toISODate(addDays(weekStart, offset)));
-      });
-
-      if (!copied.length) setMsg('No entries found in last week.');
-      else { setRows(copied); setMsg('Copied last week → current week.'); }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function applyLineToRemainingWeekdays(source: DraftRow) {
-    const sourceDate = new Date(source.entry_date + 'T00:00:00');
-    const sourceDay = sourceDate.getDay();
-    const dates = weekDays.map((d)=>toISODate(d)).filter((d)=> new Date(d+'T00:00:00').getDay() >= sourceDay && new Date(d+'T00:00:00').getDay() <= 5);
-    const additions = dates.filter((d)=> !rows.some((r)=>r.entry_date===d && r.project_id===source.project_id && r.time_in===source.time_in && r.time_out===source.time_out && r.notes===source.notes)).map((d)=> cloneRowForDate(source,d));
-    setRows((prev)=> [...prev, ...additions]);
-    setMsg(additions.length ? 'Applied line to remaining weekdays.' : 'Matching lines already exist for remaining weekdays.');
-  }
-
-  function duplicateLineToTomorrow(source: DraftRow) {
-    const next = toISODate(addDays(new Date(source.entry_date+'T00:00:00'),1));
-    setRows((prev)=> [...prev, cloneRowForDate(source,next)]);
-    setMsg('Duplicated line to tomorrow.');
-  }
-
-  function repeatPreviousEntry(entryDateISO: string) {
-    const prevDate = toISODate(addDays(new Date(entryDateISO+'T00:00:00'), -1));
-    const prevRows = rows.filter((r)=>r.entry_date===prevDate);
-    if (!prevRows.length) return setMsg('No previous-day entries to repeat.');
-    setRows((prev)=> [...prev, ...prevRows.map((r)=>cloneRowForDate(r, entryDateISO))]);
-    setMsg('Repeated previous entry for this day.');
-  }
-
-  function saveTemplate() {
-    const templateRows = rows.filter((r) => r.entry_date >= weekStartISO && r.entry_date <= weekEndISO).map((r)=>({ ...r, id: undefined, tempId: undefined }));
-    if (!templateRows.length) return setMsg('Add at least one line before saving a weekly template.');
-    localStorage.setItem('setu:timesheet-template:'+templateName, JSON.stringify(templateRows));
-    setMsg(`Saved weekly template: ${templateName}`);
-  }
-
-  function applyTemplate() {
-    const raw = localStorage.getItem('setu:timesheet-template:'+templateName);
-    if (!raw) return setMsg('No saved template found for that name.');
-    const templateRows = JSON.parse(raw);
-    const next = templateRows.map((r:any) => {
-      const idx = Math.max(0, weekDays.findIndex((d)=> new Date(r.entry_date+'T00:00:00').getDay()===d.getDay()));
-      return cloneRowForDate({ ...r, tempId: '' }, toISODate(weekDays[idx] || weekDays[0]));
-    });
-    setRows(next);
-    setMsg(`Applied weekly template: ${templateName}`);
-  }
 
   function addLine(entryDateISO: string) {
     const tempId = `tmp_${crypto.randomUUID()}`;
@@ -384,8 +238,6 @@ function SetuTrackInner() {
       return;
     }
 
-    const invalid = rows.filter((r) => r.entry_date >= weekStartISO && r.entry_date <= weekEndISO).map((r)=> validationMap[r.tempId]).filter(Boolean);
-    if (invalid.length) return setMsg(invalid[0] as string);
     setBusy(true);
     setMsg("");
 
@@ -492,7 +344,7 @@ function SetuTrackInner() {
       }));
 
       setRows(mapped);
-      setMsg("Week submitted successfully.");
+      setMsg("Week submitted ✅");
     } finally {
       setBusy(false);
     }
@@ -524,8 +376,8 @@ function SetuTrackInner() {
         <Button variant="secondary" disabled={busy || loadingWeek} onClick={saveDraft}>
           {busy ? "Saving…" : "Save draft"}
         </Button>
-        <Button variant={submittedWeek ? "secondary" : "primary"} className={submittedWeek ? "tsSubmitDone" : ""} disabled={busy || loadingWeek || submittedWeek} onClick={submitWeek}>
-          {submittedWeek ? "Week submitted" : busy ? "Working…" : "Submit week"}
+        <Button variant="primary" disabled={busy || loadingWeek} onClick={submitWeek}>
+          {busy ? "Working…" : "Submit week"}
         </Button>
       </div>
     </div>
@@ -561,23 +413,12 @@ function SetuTrackInner() {
       ) : null}
 
       <div className="card cardPad tsSummary">
-        {submittedWeek ? <div className="tsSuccessBanner">Week submitted <span aria-hidden="true">✓</span></div> : null}
         <div className="tsSummaryRow">
           <div>
             <div className="tsSummaryTitle">Week total</div>
             <div className="tsSummaryValue">{weekTotal.toFixed(2)} hrs</div>
           </div>
           <div className="muted tsSummaryHint">Tip: Add multiple lines per day. Submitted/approved lines lock.</div>
-        </div>
-        <div className="tsQuickFill">
-          <div className="label">Quick fill</div>
-          <div className="tsQuickFillActions">
-            <Button variant="secondary" size="sm" onClick={copyYesterdayToToday} disabled={!isCurrentWeek || busy || loadingWeek}>Copy yesterday → today</Button>
-            <Button variant="secondary" size="sm" onClick={copyLastWeekToCurrent} disabled={!isCurrentWeek || !!rows.length || busy || loadingWeek}>Copy last week → current</Button>
-            <input className="input tsTemplateInput" value={templateName} onChange={(e)=>setTemplateName(e.target.value)} placeholder="Template name" />
-            <Button variant="secondary" size="sm" onClick={saveTemplate} disabled={busy || loadingWeek}>Save template</Button>
-            <Button variant="secondary" size="sm" onClick={applyTemplate} disabled={busy || loadingWeek}>Apply template</Button>
-          </div>
         </div>
       </div>
 
@@ -592,7 +433,7 @@ function SetuTrackInner() {
             const dayRows = rows.filter((r) => r.entry_date === dayISO);
 
             return (
-              <section key={dayISO} ref={dayISO === todayISO ? todayRef : undefined} className="card cardPad tsDayCard">
+              <section key={dayISO} className="card cardPad tsDayCard">
                 <div className="tsDayHeader">
                   <div className="tsDayTitle">
                     {formatShort(day)} <span className="muted">({dayISO})</span>
@@ -673,14 +514,6 @@ function SetuTrackInner() {
                           ) : null}
                         </div>
                       </div>
-                      {validationMap[r.tempId] ? <div className="tsInlineError">{validationMap[r.tempId]}</div> : null}
-                      {!locked ? (
-                        <div className="tsRowActions">
-                          <button type="button" className="pill" onClick={() => repeatPreviousEntry(r.entry_date)}>Repeat previous entry</button>
-                          <button type="button" className="pill" onClick={() => duplicateLineToTomorrow(r)}>Duplicate to tomorrow</button>
-                          <button type="button" className="pill" onClick={() => applyLineToRemainingWeekdays(r)}>Apply to remaining weekdays</button>
-                        </div>
-                      ) : null}
 
                       {r.status === "rejected" && r.rejection_reason ? (
                         <div className="tsRejectReason">

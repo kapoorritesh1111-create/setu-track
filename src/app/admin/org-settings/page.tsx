@@ -6,7 +6,6 @@ import AppShell from "../../../components/layout/AppShell";
 import AdminTabs from "../../../components/admin/AdminTabs";
 import { supabase } from "../../../lib/supabaseBrowser";
 import { useProfile } from "../../../lib/useProfile";
-import WorkspaceKpiStrip from "../../../components/setu/WorkspaceKpiStrip";
 
 type OrgSettings = {
   org_id: string;
@@ -134,17 +133,7 @@ export default function AdminOrgSettingsPage() {
   return (
     <RequireOnboarding>
       <AppShell title="Organization Settings" subtitle="Branding + invoice defaults">
-        
-        <WorkspaceKpiStrip
-          items={[
-            { label: "Company", value: settings.company_name || "—", hint: "Client-facing invoice identity" },
-            { label: "Legal name", value: settings.legal_name || "—", hint: "Compliance and billing records" },
-            { label: "Currency", value: settings.default_currency || "USD", hint: "Default billing currency" },
-            { label: "Accent", value: settings.accent_color || "blue", hint: "Application theme control" },
-          ]}
-        />
-
-<AdminTabs active="org-settings" />
+        <AdminTabs active="org-settings" />
 
         {error && (
           <div className="card cardPad" style={{ maxWidth: 980, borderColor: "rgba(220,38,38,0.35)" }}>

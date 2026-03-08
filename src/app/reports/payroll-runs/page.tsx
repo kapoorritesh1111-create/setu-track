@@ -13,7 +13,6 @@ import { CommandCard } from "../../../components/ui/CommandCard";
 import ActionMenu from "../../../components/ui/ActionMenu";
 import MetaFooter from "../../../components/ui/MetaFooter";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import WorkspaceKpiStrip from "../../../components/setu/WorkspaceKpiStrip";
 
 type Run = {
   id: string;
@@ -135,17 +134,7 @@ export default function PayrollRunsPage() {
 
     return (
       <>
-        
-        <WorkspaceKpiStrip
-          items={[
-            { label: "Closed runs", value: String(totalRuns), hint: "Immutable payroll snapshots" },
-            { label: "Total hours", value: totalHours.toFixed(2), hint: "Across all payroll runs" },
-            { label: "Total amount", value: `${currency} ${money(totalAmount)}`, hint: "Run-backed payroll totals" },
-            { label: "Latest close", value: lastClosed ? new Date(lastClosed).toLocaleDateString() : "—", hint: loadedAt ? `Refreshed ${new Date(loadedAt).toLocaleTimeString()}` : "Awaiting refresh" },
-          ]}
-        />
-
-<SummaryBar>
+        <SummaryBar>
           <StatCard label="Runs" value={totalRuns} hint="Closed pay periods" />
           <StatCard label="Total hours" value={totalHours.toFixed(2)} hint="Across all runs" />
           <StatCard label="Total amount" value={`${currency} ${money(totalAmount)}`} hint="Across all runs" />

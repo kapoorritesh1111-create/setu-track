@@ -1,7 +1,6 @@
 // src/app/api/admin/invite/route.ts
 import { NextResponse } from "next/server";
 import { supabaseService } from "../../../../lib/supabaseServer";
-import { buildAuthCallbackUrl } from "../../../../lib/appUrl";
 
 type Role = "admin" | "manager" | "contractor";
 
@@ -66,7 +65,7 @@ export async function POST(req: Request) {
     }
 
     // Invite user via Supabase Auth
-    const redirectTo = buildAuthCallbackUrl();
+    const redirectTo = (`${process.env.NEXT_PUBLIC_SETUE_URL || ""}/auth/callback`).trim() || undefined;
 
     const { data: inviteData, error: inviteErr } = await supa.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (inviteErr) return NextResponse.json({ ok: false, error: inviteErr.message }, { status: 400 });

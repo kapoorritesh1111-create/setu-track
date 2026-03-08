@@ -19,7 +19,7 @@ export default function ProjectsPage() {
   return (
     <RequireOnboarding>
       <Suspense fallback={<ProjectsLoading />}>
-<ProjectsClient />
+        <ProjectsClient />
       </Suspense>
     </RequireOnboarding>
   );

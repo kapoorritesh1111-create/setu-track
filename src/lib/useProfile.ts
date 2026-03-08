@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { assertBrowserEnv, supabase } from "./supabaseBrowser";
+import { supabase } from "./supabaseBrowser";
 
 export type Profile = {
   id: string;
@@ -17,9 +17,6 @@ export type Profile = {
   address?: string | null;
   avatar_url?: string | null;
   ui_prefs?: any; // jsonb
-  country?: string | null;
-  payment_details?: any;
-  tax_information?: any;
 };
 
 type UseProfileResult = {
@@ -44,7 +41,7 @@ export function useProfile(): UseProfileResult {
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, full_name, role, hourly_rate, is_active, manager_id, onboarding_completed_at, phone, address, avatar_url, ui_prefs, country, payment_details, tax_information"
+        "id, org_id, full_name, role, hourly_rate, is_active, manager_id, onboarding_completed_at, phone, address, avatar_url, ui_prefs"
       )
       .eq("id", uid)
       .maybeSingle();
@@ -61,7 +58,6 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      assertBrowserEnv();
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
 
@@ -93,7 +89,7 @@ export function useProfile(): UseProfileResult {
     hydrate({ showLoading: true });
 
     // Auth events: do NOT flip loading=true (prevents “stuck loading” / flicker loops)
-    const { data } = supabase.auth.onAuthStateChange((event: string) => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
       if (!mountedRef.current) return;
 
       // Only re-hydrate on meaningful auth events

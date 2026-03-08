@@ -8,11 +8,11 @@ export const metadata = {
     "SETU TRACK by SETU GROUP — branded workforce time tracking, payroll operations, and export control.",
   manifest: "/site.webmanifest",
   applicationName: "SETU Track",
-  themeColor: "#0e2f63",
   icons: {
     icon: [
       { url: "/favicon.ico" },
-      { url: "/brand/setu-symbol-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",
   },
@@ -39,7 +39,6 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" data-accent="blue" data-density="comfortable" data-radius="lg">
       <body>
-        <a className="skipLink" href="#main-content">Skip to content</a>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

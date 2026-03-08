@@ -80,24 +80,6 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       .order("created_at", { ascending: false })
       .limit(25);
 
-
-    const { data: exportHistory } = await supa
-      .from("export_history")
-      .select("id, export_type, file_format, exported_at, exported_by, exported_by_name, metadata, project_export_id")
-      .eq("org_id", profile.org_id)
-      .eq("payroll_run_id", runId)
-      .order("exported_at", { ascending: false })
-      .limit(50);
-
-    const projectAllocationMap = new Map<string, { project_id: string; project_name: string; hours: number; amount: number }>();
-    for (const entry of ((entries || []) as any[])) {
-      const projectId = String(entry.project_id || "unknown");
-      const current = projectAllocationMap.get(projectId) || { project_id: projectId, project_name: entry.project_name_snapshot || "Untitled project", hours: 0, amount: 0 };
-      current.hours += Number(entry.hours || 0);
-      current.amount += Number(entry.amount || 0);
-      projectAllocationMap.set(projectId, current);
-    }
-
     const normalizedRun = {
       ...(run as any),
       is_paid: String((run as any)?.status || "").toLowerCase() === "paid" || !!(run as any)?.paid_at,
@@ -144,8 +126,6 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       audit: (audit || []) as any,
       exports: (exports || []) as any,
       receipts,
-      export_history: exportHistory || [],
-      project_allocation: Array.from(projectAllocationMap.values()).sort((a, b) => b.amount - a.amount),
       counts: {
         contractors: (lines || []).length,
         entries: (entries || []).length,
