@@ -225,6 +225,15 @@ function PayrollReportPageContent() {
     return Math.max(1, ...(payload?.trend || []).map((point) => point.amount));
   }, [payload]);
 
+  const reportSignals = useMemo(() => {
+    const register = payload?.register || [];
+    return {
+      awaitingExport: register.filter((row) => row.payment_status === "awaiting_export" || row.export_status === "not_generated").length,
+      awaitingPayment: register.filter((row) => row.payment_status === "awaiting_payment").length,
+      paidRows: register.filter((row) => row.is_paid).length,
+    };
+  }, [payload]);
+
   async function togglePaid(row: RegisterRow, nextPaid: boolean) {
     if (!row.latest_project_export_id) return;
     const note = window.prompt(nextPaid ? "Paid note (optional)" : "Reason for marking unpaid (optional)", row.paid_note || "") ?? "";
@@ -296,8 +305,29 @@ function PayrollReportPageContent() {
           <div className="setuHeaderActions">
             <span className="pill">{payload?.range.start || start || "Range"} → {payload?.range.end || end || ""}</span>
             <button className="pill" onClick={() => router.push(`/approvals?${sharedQuery}`)}>Open approvals queue</button>
+            <button className="pill" onClick={() => router.push(`/projects?${sharedQuery}`)}>Projects</button>
           </div>
         </div>
+
+        <div className="setuSummaryStrip">
+          <div className="setuSummaryStripItem">
+            <span>Periods in view</span>
+            <strong>{payload?.kpis.periods_in_view ?? 0}</strong>
+          </div>
+          <div className="setuSummaryStripItem">
+            <span>Awaiting export</span>
+            <strong>{reportSignals.awaitingExport}</strong>
+          </div>
+          <div className="setuSummaryStripItem">
+            <span>Awaiting payment</span>
+            <strong>{reportSignals.awaitingPayment}</strong>
+          </div>
+          <div className="setuSummaryStripItem">
+            <span>Paid rows</span>
+            <strong>{reportSignals.paidRows}</strong>
+          </div>
+        </div>
+
         <div className="setuFilterBar">
           <div className="setuFilterGrid">
             <label className="setuField">

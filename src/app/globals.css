@@ -506,6 +506,101 @@ textarea.nativeControl {
   gap: 10px;
   flex-wrap: wrap;
 }
+.tsCommand {
+  margin-bottom: 14px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  border: 1px solid rgba(46,196,182,0.18);
+  background: linear-gradient(135deg, rgba(11,46,74,0.98), rgba(31,95,175,0.9));
+  color: #f8fbff;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(250px, .7fr);
+  gap: 18px;
+  align-items: end;
+}
+.tsCommandEyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.86);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.tsCommandTitle {
+  margin: 14px 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+.tsCommandText {
+  margin: 12px 0 0;
+  max-width: 680px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.82);
+}
+.tsCommandMeta {
+  display: grid;
+  gap: 12px;
+}
+.tsCommandMetaCard {
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.12);
+  display: grid;
+  gap: 4px;
+}
+.tsCommandMetaCard span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: rgba(255,255,255,0.7);
+  font-weight: 800;
+}
+.tsCommandMetaCard strong {
+  font-size: 15px;
+  color: #fff;
+}
+.tsMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.tsMetricCard {
+  background: var(--setu-surface);
+  border: 1px solid var(--setu-border);
+  border-radius: 22px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 22px rgba(15,26,46,0.05);
+}
+.tsMetricLabel {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--setu-muted);
+}
+.tsMetricValueSmall {
+  margin-top: 8px;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -.04em;
+  color: var(--setu-indigo-900);
+}
+.tsMetricHint {
+  margin-top: 8px;
+  color: var(--setu-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .tsSummary {
   margin-bottom: 14px;
 }
@@ -531,6 +626,31 @@ textarea.nativeControl {
   color: var(--setu-indigo-900);
 }
 .tsSummaryHint { max-width: 420px; }
+.tsSummaryAside {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+  min-width: min(100%, 420px);
+}
+.tsSummaryAsideItem {
+  border: 1px solid var(--setu-border);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.72);
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+}
+.tsSummaryAsideItem span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--setu-muted);
+}
+.tsSummaryAsideItem strong {
+  font-size: 18px;
+  color: var(--setu-indigo-900);
+}
 .tsDays {
   display: grid;
   gap: 16px;
@@ -550,6 +670,17 @@ textarea.nativeControl {
   font-size: 18px;
   font-weight: 900;
   color: var(--setu-indigo-900);
+}
+.tsDayMeta {
+  margin-top: 6px;
+  color: var(--setu-muted);
+  font-size: 13px;
+}
+.tsDayTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .tsDayTotal {
   display: inline-flex;
@@ -582,8 +713,31 @@ textarea.nativeControl {
   background: rgba(255,255,255,0.72);
   padding: 14px;
 }
+.tsLineMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--setu-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-weight: 900;
+}
+.tsLineMeta strong {
+  color: var(--setu-indigo-900);
+  font-size: 13px;
+}
 .tsControl { width: 100%; }
 .tsNotesInput { min-width: 0; }
+.tsEmptyDay {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(36,59,107,0.04);
+  border: 1px dashed rgba(36,59,107,0.18);
+  color: var(--setu-muted);
+}
 .tsStatusCell {
   display: flex;
   align-items: center;
@@ -600,16 +754,58 @@ textarea.nativeControl {
   color: #991b1b;
   font-size: 13px;
 }
+@media (max-width: 1180px) {
+  .tsCommand,
+  .tsMetricsGrid { grid-template-columns: 1fr 1fr; }
+}
 @media (max-width: 1100px) {
   .tsGridHead { display: none; }
   .tsGridRow { grid-template-columns: 1fr 1fr; }
   .tsStatusCell { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {
+  .tsCommand,
+  .tsMetricsGrid,
+  .tsSummaryAside,
   .tsGridRow { grid-template-columns: 1fr; }
   .tsSummaryRow, .tsDayHeader { align-items: stretch; }
+  .tsDayTools { align-items: stretch; }
 }
 
+.setuSummaryStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+.setuSummaryStripItem {
+  background: var(--setu-surface);
+  border: 1px solid var(--setu-border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 8px 20px rgba(15,26,46,0.04);
+}
+.setuSummaryStripItem span {
+  color: var(--setu-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.setuSummaryStripItem strong {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--setu-indigo-900);
+}
+@media (max-width: 980px) {
+  .setuSummaryStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .setuSummaryStrip { grid-template-columns: 1fr; }
+}
 
 /* ---------- Shell brand refresh ---------- */
 .mwTopInner { padding-left: 22px; padding-right: 22px; }

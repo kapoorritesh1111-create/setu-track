@@ -60,6 +60,21 @@ function normalizeHHMM(s: string): string {
   return `${h}:${m}`;
 }
 
+function getRowHours(row: Pick<DraftRow, "time_in" | "time_out" | "lunch_hours">): number {
+  const tin = row.time_in ? normalizeHHMM(row.time_in) : "";
+  const tout = row.time_out ? normalizeHHMM(row.time_out) : "";
+  if (!tin || !tout) return 0;
+
+  const [h1, m1] = tin.split(":").map(Number);
+  const [h2, m2] = tout.split(":").map(Number);
+  if ([h1, m1, h2, m2].some((x) => Number.isNaN(x))) return 0;
+
+  const start = h1 * 60 + m1;
+  const end = h2 * 60 + m2;
+  const minutes = Math.max(end - start, 0);
+  return Math.max(minutes / 60 - (row.lunch_hours ?? 0), 0);
+}
+
 function StatusPill({ status }: { status: EntryStatus | undefined }) {
   const s = (status ?? "draft") as EntryStatus;
   return <StatusChip status={s} />;
@@ -183,25 +198,36 @@ function SetuTrackInner() {
 
     for (const r of rows) {
       const dayKey = r.entry_date;
-      const tin = r.time_in ? normalizeHHMM(r.time_in) : "";
-      const tout = r.time_out ? normalizeHHMM(r.time_out) : "";
-      if (!tin || !tout) continue;
-
-      const [h1, m1] = tin.split(":").map(Number);
-      const [h2, m2] = tout.split(":").map(Number);
-      if ([h1, m1, h2, m2].some((x) => Number.isNaN(x))) continue;
-
-      const start = h1 * 60 + m1;
-      const end = h2 * 60 + m2;
-      const minutes = Math.max(end - start, 0);
-      const hours = Math.max(minutes / 60 - (r.lunch_hours ?? 0), 0);
-
-      map[dayKey] = (map[dayKey] ?? 0) + hours;
+      map[dayKey] = (map[dayKey] ?? 0) + getRowHours(r);
     }
     return map;
   }, [rows, weekDays]);
 
   const weekTotal = useMemo(() => Object.values(hoursByDay).reduce((a, b) => a + b, 0), [hoursByDay]);
+  const weekStats = useMemo(() => {
+    const statuses = rows.reduce(
+      (acc, row) => {
+        const status = row.status ?? "draft";
+        acc[status] = (acc[status] ?? 0) + 1;
+        return acc;
+      },
+      { draft: 0, submitted: 0, approved: 0, rejected: 0 } as Record<EntryStatus, number>
+    );
+
+    const daysWithEntries = weekDays.filter((day) => rows.some((row) => row.entry_date === toISODate(day))).length;
+    const missingDays = weekDays.length - daysWithEntries;
+    const avgDay = daysWithEntries > 0 ? weekTotal / daysWithEntries : 0;
+
+    return {
+      daysWithEntries,
+      missingDays,
+      avgDay,
+      submitted: statuses.submitted,
+      approved: statuses.approved,
+      draft: statuses.draft,
+      rejected: statuses.rejected,
+    };
+  }, [rows, weekDays, weekTotal]);
 
   function addLine(entryDateISO: string) {
     const tempId = `tmp_${crypto.randomUUID()}`;
@@ -385,7 +411,7 @@ function SetuTrackInner() {
 
   if (profLoading) {
     return (
-      <AppShell title="Weekly SETU TRACK" subtitle="Loading profile…">
+      <AppShell title="My work" subtitle="Loading weekly workspace…">
         <div className="card cardPad">
           <div className="muted">Loading…</div>
         </div>
@@ -396,7 +422,7 @@ function SetuTrackInner() {
   if (!profile || !userId) return null;
 
   return (
-    <AppShell title="Weekly SETU TRACK" subtitle={headerSubtitle} right={headerRight}>
+    <AppShell title="My work" subtitle={headerSubtitle} right={headerRight}>
       {msg ? (
         <div className="alert alertInfo">
           <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg}</pre>
@@ -412,13 +438,70 @@ function SetuTrackInner() {
         </div>
       ) : null}
 
+      <section className="tsCommand">
+        <div>
+          <div className="tsCommandEyebrow">Connect · Grow · Track</div>
+          <h2 className="tsCommandTitle">Weekly time entry workspace</h2>
+          <p className="tsCommandText">
+            Log time quickly, keep each day clean, and submit only when the full week is ready for review.
+          </p>
+        </div>
+        <div className="tsCommandMeta">
+          <div className="tsCommandMetaCard">
+            <span>Week range</span>
+            <strong>{weekRangeLabel(weekStart)}</strong>
+          </div>
+          <div className="tsCommandMetaCard">
+            <span>Project access</span>
+            <strong>{projects.length} active project{projects.length === 1 ? "" : "s"}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="tsMetricsGrid">
+        <div className="tsMetricCard">
+          <div className="tsMetricLabel">Days logged</div>
+          <div className="tsMetricValueSmall">{weekStats.daysWithEntries}/7</div>
+          <div className="tsMetricHint">{weekStats.missingDays} day{weekStats.missingDays === 1 ? "" : "s"} still empty this week</div>
+        </div>
+        <div className="tsMetricCard">
+          <div className="tsMetricLabel">Submitted lines</div>
+          <div className="tsMetricValueSmall">{weekStats.submitted}</div>
+          <div className="tsMetricHint">{weekStats.approved} approved • {weekStats.draft} still in draft</div>
+        </div>
+        <div className="tsMetricCard">
+          <div className="tsMetricLabel">Average logged day</div>
+          <div className="tsMetricValueSmall">{weekStats.avgDay.toFixed(2)} hrs</div>
+          <div className="tsMetricHint">Average across the {weekStats.daysWithEntries || 0} day(s) with entries</div>
+        </div>
+        <div className="tsMetricCard">
+          <div className="tsMetricLabel">Week total</div>
+          <div className="tsMetricValueSmall">{weekTotal.toFixed(2)} hrs</div>
+          <div className="tsMetricHint">Save drafts anytime. Submit once the week is complete.</div>
+        </div>
+      </section>
+
       <div className="card cardPad tsSummary">
         <div className="tsSummaryRow">
           <div>
-            <div className="tsSummaryTitle">Week total</div>
-            <div className="tsSummaryValue">{weekTotal.toFixed(2)} hrs</div>
+            <div className="tsSummaryTitle">Submission readiness</div>
+            <div className="tsSummaryValue">{weekStats.draft + weekStats.rejected}</div>
+            <div className="muted tsSummaryHint">draft or rejected line{weekStats.draft + weekStats.rejected === 1 ? "" : "s"} still need attention before final submission.</div>
           </div>
-          <div className="muted tsSummaryHint">Tip: Add multiple lines per day. Submitted/approved lines lock.</div>
+          <div className="tsSummaryAside">
+            <div className="tsSummaryAsideItem">
+              <span>Approved</span>
+              <strong>{weekStats.approved}</strong>
+            </div>
+            <div className="tsSummaryAsideItem">
+              <span>Submitted</span>
+              <strong>{weekStats.submitted}</strong>
+            </div>
+            <div className="tsSummaryAsideItem">
+              <span>Rejected</span>
+              <strong>{weekStats.rejected}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -435,10 +518,24 @@ function SetuTrackInner() {
             return (
               <section key={dayISO} className="card cardPad tsDayCard">
                 <div className="tsDayHeader">
-                  <div className="tsDayTitle">
-                    {formatShort(day)} <span className="muted">({dayISO})</span>
+                  <div>
+                    <div className="tsDayTitle">
+                      {formatShort(day)} <span className="muted">({dayISO})</span>
+                    </div>
+                    <div className="tsDayMeta">{dayRows.length} line{dayRows.length === 1 ? "" : "s"} • {(hoursByDay[dayISO] ?? 0).toFixed(2)} hrs tracked</div>
                   </div>
-                  <div className="tsDayTotal">Day total: {(hoursByDay[dayISO] ?? 0).toFixed(2)} hrs</div>
+                  <div className="tsDayTools">
+                    <div className="tsDayTotal">Day total: {(hoursByDay[dayISO] ?? 0).toFixed(2)} hrs</div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => addLine(dayISO)}
+                      disabled={isContractor && projects.length === 0}
+                      title={isContractor && projects.length === 0 ? "Admin must assign a project first" : "Add a new line"}
+                    >
+                      + Add line
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="tsGridHead">
@@ -451,13 +548,18 @@ function SetuTrackInner() {
                   <div>Status</div>
                 </div>
 
-                {dayRows.length === 0 ? <div className="muted" style={{ marginTop: 10 }}>No lines for this day.</div> : null}
+                {dayRows.length === 0 ? <div className="tsEmptyDay">No lines for this day yet. Add time when work starts.</div> : null}
 
                 {dayRows.map((r) => {
                   const locked = r.status === "submitted" || r.status === "approved";
+                  const rowHours = getRowHours(r);
 
                   return (
                     <div key={r.tempId} className="tsRowWrap">
+                      <div className="tsLineMeta">
+                        <span>{locked ? "Locked line" : "Editable line"}</span>
+                        <strong>{rowHours.toFixed(2)} hrs</strong>
+                      </div>
                       <div className="tsGridRow">
                         <select
                           className="input tsControl"
@@ -524,17 +626,6 @@ function SetuTrackInner() {
                   );
                 })}
 
-                <div style={{ marginTop: 10 }}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => addLine(dayISO)}
-                    disabled={isContractor && projects.length === 0}
-                    title={isContractor && projects.length === 0 ? "Admin must assign a project first" : "Add a new line"}
-                  >
-                    + Add line
-                  </Button>
-                </div>
               </section>
             );
           })}
