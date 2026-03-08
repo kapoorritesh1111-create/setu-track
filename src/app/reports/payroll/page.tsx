@@ -225,7 +225,7 @@ export default function PayrollReportPage() {
     return {
       paidRows: register.filter((row) => row.is_paid).length,
       awaitingPayment: register.filter((row) => row.payment_status === "awaiting_payment").length,
-      awaitingExport: register.filter((row) => row.export_status === "not_generated" || row.payment_status === "awaiting_export").length,
+      awaitingExport: register.filter((row) => row.export_status === "not_generated" || row.export_status === "awaiting_export").length,
       receiptsLinked: register.reduce((sum, row) => sum + Number(row.receipt_count || 0), 0),
     };
   }, [payload]);
