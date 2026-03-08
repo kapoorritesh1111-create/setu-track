@@ -264,22 +264,67 @@ function SetuTrackInner() {
     setMsg('Copied yesterday → today.');
   }
 
-  function copyLastWeekToCurrent() {
-    if (!isCurrentWeek) return setMsg('Open the current week to copy last week into it.');
-    if (rows.length) return setMsg('Current week must be empty before copying last week.');
+  async function copyLastWeekToCurrent() {
+    if (!isCurrentWeek) {
+      setMsg('Open the current week to copy last week into it.');
+      return;
+    }
+    if (rows.length) {
+      setMsg('Current week must be empty before copying last week.');
+      return;
+    }
     const lastWeekStart = addDays(weekStart, -7);
     const lastStartISO = toISODate(lastWeekStart);
     const lastEndISO = toISODate(addDays(lastWeekStart, 6));
     setBusy(true);
-    supabase.from('time_entries').select('entry_date, project_id, time_in, time_out, lunch_hours, mileage, notes').eq('user_id', userId!).gte('entry_date', lastStartISO).lte('entry_date', lastEndISO).order('entry_date', { ascending: true }).then(({data,error})=>{
-      if (error) { setMsg(error.message); return; }
-      const copied = ((data||[]) as any[]).map((r) => {
-        const offset = Math.max(0, Math.round((new Date(r.entry_date+'T00:00:00').getTime()-new Date(lastStartISO+'T00:00:00').getTime())/86400000));
-        return cloneRowForDate({tempId:'', entry_date:r.entry_date, project_id:r.project_id, time_in:timeToHHMM(r.time_in), time_out:timeToHHMM(r.time_out), lunch_hours:Number(r.lunch_hours||0), mileage:Number(r.mileage||0), notes:r.notes||'', status:'draft'}, toISODate(addDays(weekStart, offset)));
+
+    try {
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('entry_date, project_id, time_in, time_out, lunch_hours, mileage, notes')
+        .eq('user_id', userId!)
+        .gte('entry_date', lastStartISO)
+        .lte('entry_date', lastEndISO)
+        .order('entry_date', { ascending: true });
+
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+
+      const copied = ((data || []) as any[]).map((r) => {
+        const offset = Math.max(
+          0,
+          Math.round(
+            (new Date(r.entry_date + 'T00:00:00').getTime() -
+              new Date(lastStartISO + 'T00:00:00').getTime()) /
+              86400000,
+          ),
+        );
+        return cloneRowForDate(
+          {
+            tempId: '',
+            entry_date: r.entry_date,
+            project_id: r.project_id,
+            time_in: timeToHHMM(r.time_in),
+            time_out: timeToHHMM(r.time_out),
+            lunch_hours: Number(r.lunch_hours || 0),
+            mileage: Number(r.mileage || 0),
+            notes: r.notes || '',
+            status: 'draft',
+          },
+          toISODate(addDays(weekStart, offset)),
+        );
       });
+
       if (!copied.length) setMsg('No entries found in last week.');
-      else { setRows(copied); setMsg('Copied last week → current week.'); }
-    }).finally(()=>setBusy(false));
+      else {
+        setRows(copied);
+        setMsg('Copied last week → current week.');
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   function applyLineToRemainingWeekdays(source: DraftRow) {
