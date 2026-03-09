@@ -544,8 +544,6 @@ function PayrollReportPageContent() {
                             <td>{row.project_count}</td>
                             <td>{row.total_hours.toFixed(2)}</td>
                             <td><strong>{money(row.total_amount, row.currency)}</strong></td>
-                            <td>{row.budget_amount != null ? <><strong>{money(row.budget_amount, row.budget_currency || row.currency)}</strong><div className="muted">{row.budget_hours != null ? `${row.budget_hours.toFixed(0)} hrs` : "No hour target"}</div></> : <span className="muted">—</span>}</td>
-                            <td>{row.amount_variance != null ? <><span className={row.amount_variance > 0 ? "pill warn" : "pill ok"}>{row.amount_variance > 0 ? "Over" : "Within"}</span><div className="muted">{money(row.amount_variance, row.budget_currency || row.currency)}</div></> : <span className="muted">Add budget</span>}</td>
                             <td><span className={pillClass(row.export_status)}>{statusLabel(row.export_status)}</span></td>
                             <td><span className={pillClass(row.payment_status)}>{statusLabel(row.payment_status)}</span></td>
                           </tr>
