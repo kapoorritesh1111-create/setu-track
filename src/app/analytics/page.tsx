@@ -140,7 +140,7 @@ function AnalyticsPageContent() {
     const hoursDelta = prevHours ? ((totalHours - prevHours) / prevHours) * 100 : totalHours > 0 ? 100 : 0;
     const costDelta = prevCost ? ((totalCost - prevCost) / prevCost) * 100 : totalCost > 0 ? 100 : 0;
 
-    const byProjectMap = new Map<string, { id: string; name: string; hours: number; cost: number; pending: number }>();
+    const byProjectMap = new Map<string, { id: string; name: string; hours: number; cost: number; pending: number; budgetAmount: number; budgetHours: number; currency: string }>();
     for (const row of rows) {
       const key = row.project_id || row.project_name || "unassigned";
       const current = byProjectMap.get(key) || { id: key, name: row.project_name || "Unassigned", hours: 0, cost: 0, pending: 0, budgetAmount: 0, budgetHours: 0, currency: "USD" };
