@@ -12,7 +12,7 @@ type AuditRow = {
   entity_type: string | null;
   entity_id: string | null;
   created_at: string | null;
-  actor_user_id: string | null;
+  actor_id: string | null;
   metadata: any;
 };
 
@@ -73,7 +73,7 @@ function AdminActivityInner() {
       setError("");
       try {
         const [auditRes, exportRes, runRes] = await Promise.all([
-          supabase.from("audit_log").select("id,action,entity_type,entity_id,created_at,actor_user_id,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(40),
+          supabase.from("audit_log").select("id,action,entity_type,entity_id,created_at,actor_id,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(40),
           supabase.from("export_events").select("id,kind,created_at,label,period_start,period_end").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
           supabase.from("payroll_runs").select("id,created_at,period_start,period_end,status,total_amount").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
         ]);
@@ -118,7 +118,7 @@ function AdminActivityInner() {
                 <div className="setuMiniRow" key={row.id} style={{ alignItems: "flex-start" }}>
                   <div>
                     <div style={{ fontWeight: 800 }}>{row.action || "event"}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>{row.entity_type || "entity"} • {row.entity_id || "—"} • actor {row.actor_user_id || "system"}</div>
+                    <div className="muted" style={{ fontSize: 12 }}>{row.entity_type || "entity"} • {row.entity_id || "—"} • actor {row.actor_id || "system"}</div>
                     {row.metadata ? <div className="muted" style={{ fontSize: 12 }}>{JSON.stringify(row.metadata).slice(0, 180)}</div> : null}
                   </div>
                   <div style={{ textAlign: "right" }}>
