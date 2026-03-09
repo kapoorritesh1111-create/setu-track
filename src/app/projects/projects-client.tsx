@@ -1380,7 +1380,7 @@ function closeCreate() {
                 </FormField>
 
                 <div className="card cardPad" style={{ boxShadow: "none", background: "var(--panel)" }}>
-                  <div style={{ fontWeight: 900, marginBottom: 6 }}>Actuals in {monthRangeLabel()}</div>
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>Actuals in {rangeLabel(rangeStart, rangeEnd)}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
                     {money((actualsMap[drawerProject.id]?.amount || 0), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.hours || 0).toFixed(2)} hrs
                   </div>
