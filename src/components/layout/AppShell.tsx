@@ -281,6 +281,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
                 type="button"
                 className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
                 onClick={() => go(item.href)}
+                aria-current={isActive(item.href) ? "page" : undefined}
               >
                 <span className="mwSideItemIcon">{item.icon}</span>
                 <span>{item.label}</span>
@@ -331,6 +332,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
                     type="button"
                     className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
                     onClick={() => go(item.href)}
+                    aria-current={isActive(item.href) ? "page" : undefined}
                   >
                     <span className="mwSideItemIcon">{item.icon}</span>
                     <span>{item.label}</span>

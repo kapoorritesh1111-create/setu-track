@@ -2,39 +2,13 @@
 
 import { useEffect, useState } from "react";
 import RequireOnboarding from "../../../components/auth/RequireOnboarding";
-import AppShell from "../../../components/layout/AppShell";
+import SetuPage from "../../../components/layout/SetuPage";
+import LoadingState from "../../../components/ui/LoadingState";
+import ErrorState from "../../../components/ui/ErrorState";
+import TableSkeleton from "../../../components/ui/TableSkeleton";
 import { supabase } from "../../../lib/supabaseBrowser";
 import { useProfile } from "../../../lib/useProfile";
-
-type AuditRow = {
-  id: string;
-  action: string | null;
-  entity_type: string | null;
-  entity_id: string | null;
-  created_at: string | null;
-  actor_id: string | null;
-  metadata: any;
-};
-
-type ExportEvent = {
-  id: string;
-  export_type: string | null;
-  file_format: string | null;
-  scope: string | null;
-  created_at: string | null;
-  period_start: string | null;
-  period_end: string | null;
-  metadata: any;
-};
-
-type PayrollRun = {
-  id: string;
-  created_at: string | null;
-  period_start: string | null;
-  period_end: string | null;
-  status: string | null;
-  total_amount: number | null;
-};
+import { getActivityData, type ActivityAuditRow as AuditRow, type ActivityExportRow as ExportEvent, type ActivityPayrollRunRow as PayrollRun } from "../../../lib/data/activityData";
 
 function formatWhen(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "—";
@@ -44,6 +18,15 @@ function formatMoney(value?: number | null) {
   return `USD ${Number(value || 0).toFixed(2)}`;
 }
 
+
+function metadataPreview(metadata?: Record<string, unknown> | null) {
+  if (!metadata) return "No metadata";
+  try {
+    return JSON.stringify(metadata, null, 2).slice(0, 220);
+  } catch {
+    return "Unable to render metadata";
+  }
+}
 function tone(action?: string | null) {
   const text = String(action || "").toLowerCase();
   if (text.includes("void") || text.includes("delete") || text.includes("reject")) return "pill warn";
@@ -74,16 +57,11 @@ function AdminActivityInner() {
       setBusy(true);
       setError("");
       try {
-        const [auditRes, exportRes, runRes] = await Promise.all([
-          supabase.from("audit_log").select("id,action,entity_type,entity_id,created_at,actor_id,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(40),
-          supabase.from("export_events").select("id,export_type,file_format,scope,created_at,period_start,period_end,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
-          supabase.from("payroll_runs").select("id,created_at,period_start,period_end,status,total_amount").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
-        ]);
-        if (auditRes.error || exportRes.error || runRes.error) throw new Error(auditRes.error?.message || exportRes.error?.message || runRes.error?.message || "Failed to load activity");
+        const { auditRows, exportRows, runRows } = await getActivityData(supabase as any, profile.org_id);
         if (!mounted) return;
-        setAuditRows((auditRes.data || []) as AuditRow[]);
-        setExportRows((exportRes.data || []) as ExportEvent[]);
-        setRunRows((runRes.data || []) as PayrollRun[]);
+        setAuditRows(auditRows);
+        setExportRows(exportRows);
+        setRunRows(runRows);
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || "Failed to load activity.");
@@ -95,23 +73,23 @@ function AdminActivityInner() {
   }, [profile?.org_id, profile?.role]);
 
   if (loading) {
-    return <AppShell title="Activity" subtitle="Admin activity timeline"><div className="card cardPad"><div className="muted">Loading activity…</div></div></AppShell>;
+    return <SetuPage title="Activity" subtitle="Audit, payroll, and export events across the workspace"><LoadingState title="Loading activity" description="Reading audit, export, and payroll timelines." /></SetuPage>;
   }
 
   if (profile?.role !== "admin") {
-    return <AppShell title="Activity" subtitle="Admin activity timeline"><div className="alert alertWarn">Admin access required.</div></AppShell>;
+    return <SetuPage title="Activity" subtitle="Audit, payroll, and export events across the workspace"><div className="alert alertWarn">Admin access required.</div></SetuPage>;
   }
 
   return (
-    <AppShell title="Activity" subtitle="Audit, payroll, and export events across the workspace">
-      {error ? <div className="alert alertError">{error}</div> : null}
+    <SetuPage title="Activity" subtitle="Audit, payroll, and export events across the workspace">
+      {error ? <ErrorState message={error} onRetry={() => void (profile?.org_id ? getActivityData(supabase as any, profile.org_id).then(({ auditRows, exportRows, runRows }) => { setAuditRows(auditRows); setExportRows(exportRows); setRunRows(runRows); setError(""); }).catch((e: any) => setError(e?.message || "Failed to load activity.")) : null)} /> : null}
       <div className="setuKpiGrid" style={{ marginBottom: 16 }}>
         <div className="setuMetricCard"><div className="setuMetricLabel">Audit events</div><div className="setuMetricValue">{auditRows.length}</div><div className="setuMetricHint">Recent entity and payroll lifecycle events.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Export events</div><div className="setuMetricValue">{exportRows.length}</div><div className="setuMetricHint">Client and payroll export history.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Payroll runs</div><div className="setuMetricValue">{runRows.length}</div><div className="setuMetricHint">Recent locked, paid, or voided snapshots.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Latest run amount</div><div className="setuMetricValue">{runRows[0] ? formatMoney(runRows[0].total_amount) : "—"}</div><div className="setuMetricHint">Latest payroll run from the timeline.</div></div>
       </div>
-      {busy ? <div className="card cardPad"><div className="muted">Loading activity…</div></div> : (
+      {busy ? <TableSkeleton rows={6} /> : (
         <div className="setuCommandGrid">
           <section className="setuSurfaceCard">
             <div className="setuSectionLead"><div><div className="setuSectionTitle">Audit timeline</div><div className="setuSectionHint">Trace payroll lifecycle, approvals, and data changes from one place.</div></div></div>
@@ -121,7 +99,7 @@ function AdminActivityInner() {
                   <div>
                     <div style={{ fontWeight: 800 }}>{row.action || "event"}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{row.entity_type || "entity"} • {row.entity_id || "—"} • actor {row.actor_id || "system"}</div>
-                    {row.metadata ? <div className="muted" style={{ fontSize: 12 }}>{JSON.stringify(row.metadata).slice(0, 180)}</div> : null}
+                    {row.metadata ? <div className="muted" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{metadataPreview(row.metadata)}</div> : null}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <span className={tone(row.action)}>{row.action || "event"}</span>
@@ -156,6 +134,6 @@ function AdminActivityInner() {
           </section>
         </div>
       )}
-    </AppShell>
+    </SetuPage>
   );
 }

@@ -226,3 +226,15 @@ Recommended verification after deploy:
 6. `/reports/payroll`
 7. `/reports/payroll-runs`
 8. `/admin/org-settings`
+
+
+## Phase 2J baseline
+
+The current baseline includes a platform alignment pass focused on:
+- shared page-state components
+- a shared page wrapper
+- centralized activity data loading
+- schema reference documentation
+- query and table usage guidance
+
+See `docs/PHASE_2J_PLATFORM_ALIGNMENT.md` for details.

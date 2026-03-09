@@ -3,10 +3,12 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RequireOnboarding from "../../components/auth/RequireOnboarding";
-import AppShell from "../../components/layout/AppShell";
+import SetuPage from "../../components/layout/SetuPage";
 import Button from "../../components/ui/Button";
 import DateRangeToolbar from "../../components/ui/DateRangeToolbar";
 import { EmptyState } from "../../components/ui/EmptyState";
+import LoadingState from "../../components/ui/LoadingState";
+import ErrorState from "../../components/ui/ErrorState";
 import { supabase } from "../../lib/supabaseBrowser";
 import { presetToRange, previousRangeFor, presetLabel, type DatePreset } from "../../lib/dateRanges";
 import { useProfile } from "../../lib/useProfile";
@@ -179,7 +181,7 @@ function AnalyticsPageContent() {
 
   return (
     <RequireOnboarding>
-      <AppShell title="Analytics" subtitle="Connect grow track — labor, payroll, and project performance insights">
+      <SetuPage title="Analytics" subtitle="Connect grow track — labor, payroll, and project performance insights">
         <div className="analyticsPage">
           <div className="analyticsHero">
             <div className="analyticsHeroTagline">Connect · Grow · Track</div>
@@ -201,10 +203,10 @@ function AnalyticsPageContent() {
             </div>
           </div>
 
-          {error ? <div className="alert alertError">{error}</div> : null}
+          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
           {busy ? (
-            <div className="card cardPad"><div className="muted">Loading analytics…</div></div>
+            <LoadingState title="Loading analytics" description="Reading labor, payroll, and project performance for the selected range." />
           ) : rows.length === 0 ? (
             <div className="card cardPad">
               <EmptyState title="No analytics in this range" description="There are no time entries in the selected window yet." action={<Button variant="ghost" onClick={() => setPreset("current_month")}>Use current month</Button>} />
@@ -287,7 +289,7 @@ function AnalyticsPageContent() {
             </>
           )}
         </div>
-      </AppShell>
+      </SetuPage>
     </RequireOnboarding>
   );
 }
@@ -295,7 +297,7 @@ function AnalyticsPageContent() {
 
 export default function AnalyticsPage() {
   return (
-    <Suspense fallback={<RequireOnboarding><AppShell title="Analytics" subtitle="Connect grow track — labor, payroll, and project performance insights"><div className="card cardPad"><div className="muted">Loading analytics…</div></div></AppShell></RequireOnboarding>}>
+    <Suspense fallback={<RequireOnboarding><SetuPage title="Analytics" subtitle="Connect grow track — labor, payroll, and project performance insights"><LoadingState title="Loading analytics" description="Reading labor, payroll, and project performance for the selected range." /></SetuPage></RequireOnboarding>}>
       <AnalyticsPageContent />
     </Suspense>
   );
