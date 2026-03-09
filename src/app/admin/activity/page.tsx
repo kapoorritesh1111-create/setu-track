@@ -18,11 +18,13 @@ type AuditRow = {
 
 type ExportEvent = {
   id: string;
-  kind: string | null;
+  export_type: string | null;
+  file_format: string | null;
+  scope: string | null;
   created_at: string | null;
-  label: string | null;
   period_start: string | null;
   period_end: string | null;
+  metadata: any;
 };
 
 type PayrollRun = {
@@ -74,7 +76,7 @@ function AdminActivityInner() {
       try {
         const [auditRes, exportRes, runRes] = await Promise.all([
           supabase.from("audit_log").select("id,action,entity_type,entity_id,created_at,actor_id,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(40),
-          supabase.from("export_events").select("id,kind,created_at,label,period_start,period_end").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
+          supabase.from("export_events").select("id,export_type,file_format,scope,created_at,period_start,period_end,metadata").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
           supabase.from("payroll_runs").select("id,created_at,period_start,period_end,status,total_amount").eq("org_id", profile.org_id).order("created_at", { ascending: false }).limit(20),
         ]);
         if (auditRes.error || exportRes.error || runRes.error) throw new Error(auditRes.error?.message || exportRes.error?.message || runRes.error?.message || "Failed to load activity");
@@ -144,7 +146,7 @@ function AdminActivityInner() {
               {exportRows.map((row) => (
                 <div className="setuMiniRow" key={`exp-${row.id}`}>
                   <div>
-                    <div style={{ fontWeight: 800 }}>{row.label || row.kind || "Export event"}</div>
+                    <div style={{ fontWeight: 800 }}>{row.metadata?.label || row.export_type || "Export event"}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{row.period_start || "—"} → {row.period_end || "—"}</div>
                   </div>
                   <div className="muted" style={{ fontSize: 12 }}>{formatWhen(row.created_at)}</div>
