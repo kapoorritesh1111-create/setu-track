@@ -41,7 +41,7 @@ type ProjectBudget = {
   budget_currency: string | null;
 };
 
-function money(value: number) { return `USD ${value.toFixed(2)}`; }
+function money(value: number, currency = "USD") { return `${currency} ${value.toFixed(2)}`; }
 function pct(delta: number) { return `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`; }
 
 function AnalyticsPageContent() {
