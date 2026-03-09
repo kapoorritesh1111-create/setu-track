@@ -34,6 +34,13 @@ type PayrollRun = {
   status: string | null;
 };
 
+type ProjectBudget = {
+  id: string;
+  budget_hours: number | null;
+  budget_amount: number | null;
+  budget_currency: string | null;
+};
+
 function money(value: number) { return `USD ${value.toFixed(2)}`; }
 function pct(delta: number) { return `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`; }
 
@@ -47,6 +54,7 @@ function AnalyticsPageContent() {
   const [rows, setRows] = useState<EntryRow[]>([]);
   const [previousRows, setPreviousRows] = useState<EntryRow[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
+  const [projectBudgets, setProjectBudgets] = useState<Record<string, ProjectBudget>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
 
@@ -85,8 +93,13 @@ function AnalyticsPageContent() {
         .order("created_at", { ascending: false })
         .limit(6);
 
-      const [{ data: current, error: currentError }, { data: previous, error: previousError }, { data: payrollRuns, error: runError }] = await Promise.all([currentQuery, previousQuery, runQuery]);
-      if (currentError || previousError || runError) throw new Error(currentError?.message || previousError?.message || runError?.message || "Failed to load analytics");
+      const budgetQuery = supabase
+        .from("projects")
+        .select("id, budget_hours, budget_amount, budget_currency")
+        .eq("org_id", profile.org_id);
+
+      const [{ data: current, error: currentError }, { data: previous, error: previousError }, { data: payrollRuns, error: runError }, { data: budgetRows, error: budgetError }] = await Promise.all([currentQuery, previousQuery, runQuery, budgetQuery]);
+      if (currentError || previousError || runError || budgetError) throw new Error(currentError?.message || previousError?.message || runError?.message || budgetError?.message || "Failed to load analytics");
 
       const restrict = profile.role === "contractor"
         ? (list: EntryRow[]) => list.filter((row) => row.user_id === userId)
@@ -97,11 +110,13 @@ function AnalyticsPageContent() {
       setRows(restrict((current || []) as EntryRow[]));
       setPreviousRows(restrict((previous || []) as EntryRow[]));
       setRuns((payrollRuns || []) as PayrollRun[]);
+      setProjectBudgets(Object.fromEntries(((budgetRows || []) as any[]).map((row) => [row.id, row])));
     } catch (e: any) {
       setError(e?.message || "Failed to load analytics.");
       setRows([]);
       setPreviousRows([]);
       setRuns([]);
+      setProjectBudgets({});
     } finally {
       setBusy(false);
     }
@@ -128,13 +143,19 @@ function AnalyticsPageContent() {
     const byProjectMap = new Map<string, { id: string; name: string; hours: number; cost: number; pending: number }>();
     for (const row of rows) {
       const key = row.project_id || row.project_name || "unassigned";
-      const current = byProjectMap.get(key) || { id: key, name: row.project_name || "Unassigned", hours: 0, cost: 0, pending: 0 };
+      const current = byProjectMap.get(key) || { id: key, name: row.project_name || "Unassigned", hours: 0, cost: 0, pending: 0, budgetAmount: 0, budgetHours: 0, currency: "USD" };
       current.hours += Number(row.hours_worked || 0);
       current.cost += Number(row.hours_worked || 0) * Number(row.hourly_rate_snapshot || 0);
       if (row.status === "submitted") current.pending += 1;
+      const budget = row.project_id ? projectBudgets[row.project_id] : null;
+      current.budgetAmount = Number(budget?.budget_amount || 0);
+      current.budgetHours = Number(budget?.budget_hours || 0);
+      current.currency = budget?.budget_currency || "USD";
       byProjectMap.set(key, current);
     }
     const byProject = Array.from(byProjectMap.values()).sort((a,b) => b.cost - a.cost).slice(0, 5);
+    const budgetedProjects = byProject.filter((item) => item.budgetAmount > 0);
+    const overBudgetProjects = budgetedProjects.filter((item) => item.cost > item.budgetAmount);
 
     const byPersonMap = new Map<string, { id: string; name: string; hours: number; cost: number }>();
     for (const row of rows) {
@@ -146,8 +167,8 @@ function AnalyticsPageContent() {
     }
     const byPerson = Array.from(byPersonMap.values()).sort((a,b) => b.hours - a.hours).slice(0, 5);
 
-    return { totalHours, approvedHours, submittedHours, totalCost, people, projects, hoursDelta, costDelta, byProject, byPerson };
-  }, [rows, previousRows]);
+    return { totalHours, approvedHours, submittedHours, totalCost, people, projects, hoursDelta, costDelta, byProject, byPerson, budgetedProjects: budgetedProjects.length, overBudgetProjects: overBudgetProjects.length };
+  }, [rows, previousRows, projectBudgets]);
 
   const barMax = Math.max(1, ...summary.byProject.map((item) => item.cost), ...summary.byPerson.map((item) => item.hours));
 
@@ -189,18 +210,18 @@ function AnalyticsPageContent() {
                 <div className="setuMetricCard"><div className="setuMetricLabel">Total labor cost</div><div className="setuMetricValue">{money(summary.totalCost)}</div><div className={`setuMetricHint ${summary.costDelta >= 0 ? "analyticsDeltaPositive" : "analyticsDeltaNegative"}`}>{pct(summary.costDelta)} vs prior range</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Tracked hours</div><div className="setuMetricValue">{summary.totalHours.toFixed(2)}</div><div className={`setuMetricHint ${summary.hoursDelta >= 0 ? "analyticsDeltaPositive" : "analyticsDeltaNegative"}`}>{pct(summary.hoursDelta)} vs prior range</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Approved hours</div><div className="setuMetricValue">{summary.approvedHours.toFixed(2)}</div><div className="setuMetricHint">{summary.submittedHours.toFixed(2)} hrs still awaiting review</div></div>
-                <div className="setuMetricCard"><div className="setuMetricLabel">Coverage</div><div className="setuMetricValue">{summary.people} people</div><div className="setuMetricHint">Across {summary.projects} active projects in {presetLabel(preset, start, end).toLowerCase()}</div></div>
+                <div className="setuMetricCard"><div className="setuMetricLabel">Coverage</div><div className="setuMetricValue">{summary.people} people</div><div className="setuMetricHint">Across {summary.projects} active projects in {presetLabel(preset, start, end).toLowerCase()} • {summary.overBudgetProjects} over budget</div></div>
               </div>
 
               <div className="analyticsSplit">
                 <div className="analyticsPanel">
-                  <div className="setuCardHeaderRow"><div><div className="setuSectionTitle" style={{ fontSize: 20 }}>Project labor mix</div><div className="setuSectionHint">The same project lens used by the dashboard project health cards.</div></div><Button variant="secondary" onClick={() => (window.location.href = "/projects")}>Projects</Button></div>
+                  <div className="setuCardHeaderRow"><div><div className="setuSectionTitle" style={{ fontSize: 20 }}>Project labor mix</div><div className="setuSectionHint">Budget-aware labor mix for the same project health layer used by the command center.</div></div><Button variant="secondary" onClick={() => (window.location.href = "/projects")}>Projects</Button></div>
                   <div className="analyticsBars">
                     {summary.byProject.map((item) => (
                       <div className="analyticsBarItem" key={item.id}>
                         <div className="analyticsBarHead"><span>{item.name}</span><span>{money(item.cost)} · {item.hours.toFixed(2)} hrs</span></div>
                         <div className="analyticsBarTrack"><div className="analyticsBarFill" style={{ width: `${Math.max(8, (item.cost / barMax) * 100)}%` }} /></div>
-                        <div className="muted" style={{ fontSize: 12 }}>{item.pending} pending approvals in this range</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{item.pending} pending approvals • {item.budgetAmount > 0 ? `${item.cost > item.budgetAmount ? "over" : "within"} ${money(item.budgetAmount, item.currency)} budget` : "no budget"}</div>
                       </div>
                     ))}
                   </div>

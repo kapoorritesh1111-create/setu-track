@@ -24,6 +24,15 @@ type Project = {
   is_active: boolean;
   org_id: string;
   week_start?: WeekStart | null;
+  budget_hours?: number | null;
+  budget_amount?: number | null;
+  budget_currency?: string | null;
+};
+
+type ProjectActual = {
+  hours: number;
+  amount: number;
+  pending: number;
 };
 
 type MemberRow = {
@@ -61,6 +70,36 @@ function copyToClipboard(text: string) {
   }
 }
 
+
+function monthRangeLabel() {
+  const now = new Date();
+  return now.toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
+function currentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { start: fmt(start), end: fmt(end) };
+}
+
+function money(amount: number, currency = "USD") {
+  return `${currency} ${Number(amount || 0).toFixed(2)}`;
+}
+
+function budgetHealthTone(variance: number, hasBudget: boolean): "success" | "warn" | "default" {
+  if (!hasBudget) return "default";
+  return variance <= 0 ? "success" : "warn";
+}
+
+function budgetHealthLabel(variance: number, hasBudget: boolean) {
+  if (!hasBudget) return "No budget";
+  if (variance <= 0) return "Within budget";
+  return "Over budget";
+}
+
+
 export default function ProjectsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,6 +111,11 @@ export default function ProjectsClient() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [fetchErr, setFetchErr] = useState<string>("");
+  const [actualsMap, setActualsMap] = useState<Record<string, ProjectActual>>({});
+  const [budgetBusy, setBudgetBusy] = useState(false);
+  const [drawerBudgetHours, setDrawerBudgetHours] = useState("");
+  const [drawerBudgetAmount, setDrawerBudgetAmount] = useState("");
+  const [drawerBudgetCurrency, setDrawerBudgetCurrency] = useState("USD");
 
   // Assignment mode (Admin only): /projects?user=<profile_id>
   const [manageUser, setManageUser] = useState<SimpleProfile | null>(null);
@@ -84,6 +128,9 @@ export default function ProjectsClient() {
   // Admin create project
   const [newName, setNewName] = useState("");
   const [newWeekStart, setNewWeekStart] = useState<WeekStart>("sunday");
+  const [newBudgetHours, setNewBudgetHours] = useState("");
+  const [newBudgetAmount, setNewBudgetAmount] = useState("");
+  const [newBudgetCurrency, setNewBudgetCurrency] = useState("USD");
   const [createBusy, setCreateBusy] = useState(false);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
 
@@ -164,7 +211,7 @@ function closeCreate() {
     if (isManagerOrAdmin) {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, is_active, org_id, week_start")
+        .select("id, name, is_active, org_id, week_start, budget_hours, budget_amount, budget_currency")
         .eq("org_id", profile.org_id)
         .order("name", { ascending: true });
 
@@ -177,7 +224,7 @@ function closeCreate() {
       // contractor: only assigned projects
       const { data, error } = await supabase
         .from("project_members")
-        .select("project_id, projects:project_id (id, name, is_active, org_id, week_start)")
+        .select("project_id, projects:project_id (id, name, is_active, org_id, week_start, budget_hours, budget_amount, budget_currency)")
         .eq("profile_id", profile.id)
         .eq("is_active", true);
 
@@ -191,6 +238,43 @@ function closeCreate() {
       uniq.sort((a, b) => a.name.localeCompare(b.name));
       setProjects(uniq);
     }
+  }
+
+  async function loadProjectActuals(sourceProjects: Project[]) {
+    if (!profile?.org_id) return;
+    const ids = sourceProjects.map((project) => project.id).filter(Boolean);
+    if (!ids.length) {
+      setActualsMap({});
+      return;
+    }
+
+    const month = currentMonthRange();
+    const { data, error } = await supabase
+      .from("v_time_entries")
+      .select("project_id, hours_worked, hourly_rate_snapshot, status, user_id")
+      .eq("org_id", profile.org_id)
+      .gte("entry_date", month.start)
+      .lte("entry_date", month.end);
+
+    if (error) {
+      setFetchErr(error.message);
+      return;
+    }
+
+    const allowedProjectIds = new Set(ids);
+    const next: Record<string, ProjectActual> = {};
+    for (const row of (data || []) as any[]) {
+      const projectId = String(row.project_id || "");
+      if (!allowedProjectIds.has(projectId)) continue;
+      const current = next[projectId] || { hours: 0, amount: 0, pending: 0 };
+      const hours = Number(row.hours_worked || 0);
+      current.hours += hours;
+      current.amount += hours * Number(row.hourly_rate_snapshot || 0);
+      if (row.status === "submitted") current.pending += 1;
+      next[projectId] = current;
+    }
+
+    setActualsMap(next);
   }
 
   // Initial load
@@ -301,6 +385,16 @@ function closeCreate() {
     };
   }, [loading, profile?.org_id, manageUserId, isAdmin]);
 
+  useEffect(() => {
+    if (!profile?.org_id || !projects.length) {
+      if (!projects.length) setActualsMap({});
+      return;
+    }
+    void loadProjectActuals(projects);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.org_id, projects]);
+
+
   const assignedProjectIds = useMemo(() => {
     return new Set(
       Object.entries(memberMap)
@@ -329,6 +423,37 @@ function closeCreate() {
     }
     return { total, active, inactive };
   }, [projects]);
+
+  const financeSummary = useMemo(() => {
+    const rows = filteredProjects.map((project) => {
+      const actual = actualsMap[project.id] || { hours: 0, amount: 0, pending: 0 };
+      const budgetAmount = Number(project.budget_amount || 0);
+      const budgetHours = Number(project.budget_hours || 0);
+      return {
+        id: project.id,
+        name: project.name,
+        currency: project.budget_currency || "USD",
+        actualHours: actual.hours,
+        actualAmount: actual.amount,
+        budgetHours,
+        budgetAmount,
+        hoursVariance: budgetHours > 0 ? actual.hours - budgetHours : 0,
+        amountVariance: budgetAmount > 0 ? actual.amount - budgetAmount : 0,
+      };
+    });
+
+    const totals = rows.reduce((acc, row) => {
+      acc.budgetHours += row.budgetHours;
+      acc.actualHours += row.actualHours;
+      acc.budgetAmount += row.budgetAmount;
+      acc.actualAmount += row.actualAmount;
+      if (row.budgetAmount > 0) acc.budgetedProjects += 1;
+      if (row.budgetAmount > 0 && row.amountVariance > 0) acc.overBudgetProjects += 1;
+      return acc;
+    }, { budgetHours: 0, actualHours: 0, budgetAmount: 0, actualAmount: 0, budgetedProjects: 0, overBudgetProjects: 0 });
+
+    return { rows, totals };
+  }, [filteredProjects, actualsMap]);
 
   function exportCsv() {
     const header = ["name", "project_id", "is_active"].join(",");
@@ -419,6 +544,9 @@ function closeCreate() {
         name,
         is_active: true,
         week_start: newWeekStart,
+        budget_hours: newBudgetHours ? Number(newBudgetHours) : null,
+        budget_amount: newBudgetAmount ? Number(newBudgetAmount) : null,
+        budget_currency: (newBudgetCurrency || "USD").trim() || "USD",
       });
 
       if (error) {
@@ -428,6 +556,9 @@ function closeCreate() {
 
       setNewName("");
       setNewWeekStart("sunday");
+      setNewBudgetHours("");
+      setNewBudgetAmount("");
+      setNewBudgetCurrency("USD");
       await reloadProjects();
       return true;
     } finally {
@@ -484,10 +615,54 @@ function closeCreate() {
     }
   }
 
+  async function updateProjectBudget(projectId: string) {
+    if (!profile || !isAdmin) return;
+
+    try {
+      setBudgetBusy(true);
+      setDrawerMsg("");
+      const budgetHours = drawerBudgetHours.trim() ? Number(drawerBudgetHours) : null;
+      const budgetAmount = drawerBudgetAmount.trim() ? Number(drawerBudgetAmount) : null;
+      const budgetCurrency = (drawerBudgetCurrency || "USD").trim().toUpperCase() || "USD";
+
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          budget_hours: budgetHours,
+          budget_amount: budgetAmount,
+          budget_currency: budgetCurrency,
+        })
+        .eq("id", projectId)
+        .eq("org_id", profile.org_id);
+
+      if (error) {
+        setDrawerMsg(error.message);
+        return;
+      }
+
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId
+            ? { ...project, budget_hours: budgetHours, budget_amount: budgetAmount, budget_currency: budgetCurrency }
+            : project
+        )
+      );
+    } finally {
+      setBudgetBusy(false);
+    }
+  }
+
   const drawerProject = useMemo(() => {
     if (!drawerProjectId) return null;
     return projects.find((p) => p.id === drawerProjectId) || null;
   }, [drawerProjectId, projects]);
+
+  useEffect(() => {
+    if (!drawerProject) return;
+    setDrawerBudgetHours(drawerProject.budget_hours != null ? String(drawerProject.budget_hours) : "");
+    setDrawerBudgetAmount(drawerProject.budget_amount != null ? String(drawerProject.budget_amount) : "");
+    setDrawerBudgetCurrency(drawerProject.budget_currency || "USD");
+  }, [drawerProject?.id]);
 
   async function openDrawer(projectId: string) {
     if (!profile) return;
@@ -707,6 +882,29 @@ function closeCreate() {
           </div>
         ) : null}
 
+        <div className="setuMetricGrid" style={{ marginBottom: 14 }}>
+          <div className="setuMetricCard">
+            <div className="setuMetricLabel">Budget coverage</div>
+            <div className="setuMetricValue">{financeSummary.totals.budgetedProjects}</div>
+            <div className="setuMetricHint">Projects with an active labor budget in {monthRangeLabel()}.</div>
+          </div>
+          <div className="setuMetricCard">
+            <div className="setuMetricLabel">Actual labor this month</div>
+            <div className="setuMetricValue">{money(financeSummary.totals.actualAmount)}</div>
+            <div className="setuMetricHint">{financeSummary.totals.actualHours.toFixed(2)} hours logged this month.</div>
+          </div>
+          <div className="setuMetricCard">
+            <div className="setuMetricLabel">Budget vs actual</div>
+            <div className="setuMetricValue">{financeSummary.totals.budgetAmount > 0 ? money(financeSummary.totals.budgetAmount - financeSummary.totals.actualAmount) : "—"}</div>
+            <div className="setuMetricHint">{financeSummary.totals.budgetAmount > 0 ? `${financeSummary.totals.overBudgetProjects} project(s) over budget.` : "Add budgets to turn projects into a finance workspace."}</div>
+          </div>
+          <div className="setuMetricCard">
+            <div className="setuMetricLabel">Hours vs plan</div>
+            <div className="setuMetricValue">{financeSummary.totals.budgetHours > 0 ? `${financeSummary.totals.actualHours.toFixed(0)} / ${financeSummary.totals.budgetHours.toFixed(0)}` : `${financeSummary.totals.actualHours.toFixed(0)}`}</div>
+            <div className="setuMetricHint">Use budget hours to compare planned vs actual utilization.</div>
+          </div>
+        </div>
+
         <CommandBar
           views={
             <SavedViews
@@ -882,6 +1080,50 @@ function closeCreate() {
               },
             },
             {
+              key: "budget",
+              header: `Budget (${monthRangeLabel()})`,
+              width: 190,
+              cell: (p) => {
+                const hasBudget = Number(p.budget_amount || 0) > 0 || Number(p.budget_hours || 0) > 0;
+                return (
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <strong>{hasBudget ? money(Number(p.budget_amount || 0), p.budget_currency || "USD") : "—"}</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>{Number(p.budget_hours || 0) > 0 ? `${Number(p.budget_hours || 0).toFixed(0)} hrs planned` : "No hour target"}</div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: "actual",
+              header: "Actual",
+              width: 190,
+              cell: (p) => {
+                const actual = actualsMap[p.id] || { hours: 0, amount: 0, pending: 0 };
+                return (
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <strong>{money(actual.amount, p.budget_currency || "USD")}</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>{actual.hours.toFixed(2)} hrs • {actual.pending} pending</div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: "variance",
+              header: "Variance",
+              width: 170,
+              cell: (p) => {
+                const actual = actualsMap[p.id] || { hours: 0, amount: 0, pending: 0 };
+                const budgetAmount = Number(p.budget_amount || 0);
+                const variance = budgetAmount > 0 ? actual.amount - budgetAmount : 0;
+                return (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <Tag tone={budgetHealthTone(variance, budgetAmount > 0)}>{budgetHealthLabel(variance, budgetAmount > 0)}</Tag>
+                    <div className="muted" style={{ fontSize: 12 }}>{budgetAmount > 0 ? `${variance > 0 ? "+" : ""}${money(variance, p.budget_currency || "USD")}` : "Add budget to compare"}</div>
+                  </div>
+                );
+              },
+            },
+            {
               key: "toggle",
               header: "",
               width: 140,
@@ -1000,6 +1242,76 @@ function closeCreate() {
                   )}
                 </FormField>
               </div>
+
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                <FormField label="Budget amount" helpText="Optional monthly labor budget target for this project." helpMode="tooltip">
+                  {({ id, describedBy }) =>
+                    isAdmin ? (
+                      <input
+                        id={id}
+                        aria-describedby={describedBy}
+                        className="input"
+                        inputMode="decimal"
+                        value={drawerBudgetAmount}
+                        onChange={(e) => setDrawerBudgetAmount(e.target.value)}
+                        placeholder="e.g., 12000"
+                      />
+                    ) : (
+                      <div id={id} aria-describedby={describedBy} style={{ padding: "10px 12px" }}>
+                        {drawerProject.budget_amount != null ? money(Number(drawerProject.budget_amount || 0), drawerProject.budget_currency || "USD") : "No budget set"}
+                      </div>
+                    )
+                  }
+                </FormField>
+
+                <FormField label="Budget hours" helpText="Optional hour target for budget-vs-actual reporting." helpMode="tooltip">
+                  {({ id, describedBy }) =>
+                    isAdmin ? (
+                      <input
+                        id={id}
+                        aria-describedby={describedBy}
+                        className="input"
+                        inputMode="decimal"
+                        value={drawerBudgetHours}
+                        onChange={(e) => setDrawerBudgetHours(e.target.value)}
+                        placeholder="e.g., 160"
+                      />
+                    ) : (
+                      <div id={id} aria-describedby={describedBy} style={{ padding: "10px 12px" }}>
+                        {drawerProject.budget_hours != null ? `${Number(drawerProject.budget_hours || 0).toFixed(0)} hrs` : "No hour target"}
+                      </div>
+                    )
+                  }
+                </FormField>
+
+                <FormField label="Currency" helpText="Used for budget display across project finance views." helpMode="tooltip">
+                  {({ id, describedBy }) =>
+                    isAdmin ? (
+                      <input id={id} aria-describedby={describedBy} className="input" value={drawerBudgetCurrency} onChange={(e) => setDrawerBudgetCurrency(e.target.value.toUpperCase())} maxLength={6} />
+                    ) : (
+                      <div id={id} aria-describedby={describedBy} style={{ padding: "10px 12px" }}>{drawerProject.budget_currency || "USD"}</div>
+                    )
+                  }
+                </FormField>
+
+                <div className="card cardPad" style={{ boxShadow: "none", background: "var(--panel)" }}>
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>Actuals in {monthRangeLabel()}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {money((actualsMap[drawerProject.id]?.amount || 0), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.hours || 0).toFixed(2)} hrs
+                  </div>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                    {budgetHealthLabel((actualsMap[drawerProject.id]?.amount || 0) - Number(drawerProject.budget_amount || 0), Number(drawerProject.budget_amount || 0) > 0)}
+                  </div>
+                </div>
+              </div>
+
+              {isAdmin ? (
+                <div className="row" style={{ justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+                  <button className="btnPrimary" disabled={budgetBusy} onClick={() => updateProjectBudget(drawerProject.id)}>
+                    {budgetBusy ? "Saving…" : "Save budget"}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -1137,8 +1449,26 @@ function closeCreate() {
                 )}
               </FormField>
 
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 120px", gap: 12 }}>
+                <FormField label="Budget amount" helpText="Optional labor budget target for the project." helpMode="tooltip">
+                  {({ id, describedBy }) => (
+                    <input id={id} aria-describedby={describedBy} className="input" inputMode="decimal" value={newBudgetAmount} onChange={(e) => setNewBudgetAmount(e.target.value)} placeholder="e.g., 12000" />
+                  )}
+                </FormField>
+                <FormField label="Budget hours" helpText="Optional utilization target for the project." helpMode="tooltip">
+                  {({ id, describedBy }) => (
+                    <input id={id} aria-describedby={describedBy} className="input" inputMode="decimal" value={newBudgetHours} onChange={(e) => setNewBudgetHours(e.target.value)} placeholder="e.g., 160" />
+                  )}
+                </FormField>
+                <FormField label="Currency" helpText="Shown in project finance reporting." helpMode="tooltip">
+                  {({ id, describedBy }) => (
+                    <input id={id} aria-describedby={describedBy} className="input" value={newBudgetCurrency} onChange={(e) => setNewBudgetCurrency(e.target.value.toUpperCase())} maxLength={6} />
+                  )}
+                </FormField>
+              </div>
+
               <div className="muted" style={{ fontSize: 12 }}>
-                Tip: Create the project first, then add members in the Project drawer.
+                Tip: Create the project first, then add members in the Project drawer. Budgets power the new project finance layer.
               </div>
             </div>
           </div>

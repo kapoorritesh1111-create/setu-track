@@ -69,6 +69,11 @@ type ProjectSummaryRow = {
   payment_status: PaymentStatus;
   paid_amount: number;
   receipt_count: number;
+  budget_hours: number | null;
+  budget_amount: number | null;
+  budget_currency: string;
+  hours_variance: number | null;
+  amount_variance: number | null;
 };
 
 type ContractorSummaryRow = {
@@ -231,6 +236,17 @@ function PayrollReportPageContent() {
       awaitingExport: register.filter((row) => row.payment_status === "awaiting_export" || row.export_status === "not_generated").length,
       awaitingPayment: register.filter((row) => row.payment_status === "awaiting_payment").length,
       paidRows: register.filter((row) => row.is_paid).length,
+    };
+  }, [payload]);
+
+  const budgetSignals = useMemo(() => {
+    const projects = payload?.project_summary || [];
+    const budgeted = projects.filter((row) => Number(row.budget_amount || 0) > 0);
+    const overBudget = budgeted.filter((row) => Number(row.amount_variance || 0) > 0);
+    return {
+      budgetedCount: budgeted.length,
+      overBudgetCount: overBudget.length,
+      totalBudget: budgeted.reduce((sum, row) => sum + Number(row.budget_amount || 0), 0),
     };
   }, [payload]);
 
@@ -420,6 +436,7 @@ function PayrollReportPageContent() {
               <MetricCard label="Total hours" value={payload.kpis.total_hours.toFixed(2)} hint="Anyone with active time entries in scope." />
               <MetricCard label="Paid in view" value={money(payload.kpis.paid_amount)} hint={`${payload.kpis.paid_rows} paid rows currently visible.`} />
               <MetricCard label="Needs export" value={String(payload.kpis.needs_export_count)} hint="Rows still awaiting first client export." />
+              <MetricCard label="Budget coverage" value={String(budgetSignals.budgetedCount)} hint={budgetSignals.budgetedCount ? `${budgetSignals.overBudgetCount} project(s) over budget in view.` : "Add project budgets to activate variance tracking."} />
             </div>
 
             <div className="setuInsightGrid">
@@ -484,6 +501,8 @@ function PayrollReportPageContent() {
                           <th>Contractors</th>
                           <th>Hours</th>
                           <th>Gross Pay</th>
+                          <th>Budget</th>
+                          <th>Variance</th>
                           <th>Export</th>
                           <th>Payment</th>
                         </tr>
@@ -525,6 +544,8 @@ function PayrollReportPageContent() {
                             <td>{row.project_count}</td>
                             <td>{row.total_hours.toFixed(2)}</td>
                             <td><strong>{money(row.total_amount, row.currency)}</strong></td>
+                            <td>{row.budget_amount != null ? <><strong>{money(row.budget_amount, row.budget_currency || row.currency)}</strong><div className="muted">{row.budget_hours != null ? `${row.budget_hours.toFixed(0)} hrs` : "No hour target"}</div></> : <span className="muted">—</span>}</td>
+                            <td>{row.amount_variance != null ? <><span className={row.amount_variance > 0 ? "pill warn" : "pill ok"}>{row.amount_variance > 0 ? "Over" : "Within"}</span><div className="muted">{money(row.amount_variance, row.budget_currency || row.currency)}</div></> : <span className="muted">Add budget</span>}</td>
                             <td><span className={pillClass(row.export_status)}>{statusLabel(row.export_status)}</span></td>
                             <td><span className={pillClass(row.payment_status)}>{statusLabel(row.payment_status)}</span></td>
                           </tr>
@@ -617,15 +638,18 @@ function PayrollReportPageContent() {
 
               <div className="setuSideStack">
                 <div className="setuSideCard">
-                  <div className="setuSectionTitle">Payroll cost distribution</div>
-                  <div className="setuSectionHint">Top project totals in the current view with share of payroll cost.</div>
+                  <div className="setuSectionTitle">Budget vs actual</div>
+                  <div className="setuSectionHint">Track which projects are burning above plan in the current payroll view.</div>
                   <div className="setuDistributionList">
                     {payload.project_summary.slice(0, 5).map((row) => {
                       const pct = payload.kpis.total_payroll_cost > 0 ? Math.round((row.total_amount / payload.kpis.total_payroll_cost) * 100) : 0;
+                      const hasBudget = row.budget_amount != null && row.budget_amount > 0;
+                      const variance = Number(row.amount_variance || 0);
                       return (
                         <div key={row.id} className="setuDistributionItem">
-                          <div className="setuTrendMeta"><strong>{row.project_name}</strong><span>{money(row.total_amount, row.currency)} ({pct}%)</span></div>
-                          <div className="setuTrendTrack"><div className="setuTrendFill" style={{ width: `${Math.max(6, pct)}%` }} /></div>
+                          <div className="setuTrendMeta"><strong>{row.project_name}</strong><span>{money(row.total_amount, row.currency)}{hasBudget ? ` vs ${money(row.budget_amount || 0, row.budget_currency || row.currency)}` : ` (${pct}%)`}</span></div>
+                          <div className="setuTrendTrack"><div className="setuTrendFill" style={{ width: `${Math.max(6, hasBudget && row.budget_amount ? Math.min(100, Math.round((row.total_amount / row.budget_amount) * 100)) : pct)}%` }} /></div>
+                          <div className="muted" style={{ fontSize: 12 }}>{hasBudget ? `${variance > 0 ? 'Over' : 'Within'} by ${money(variance, row.budget_currency || row.currency)}` : 'No budget set yet'}</div>
                         </div>
                       );
                     })}

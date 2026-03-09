@@ -63,6 +63,11 @@ type ProjectSummaryRow = {
   payment_status: PaymentStatus;
   paid_amount: number;
   receipt_count: number;
+  budget_hours: number | null;
+  budget_amount: number | null;
+  budget_currency: string;
+  hours_variance: number | null;
+  amount_variance: number | null;
 };
 
 type ContractorSummaryRow = {
@@ -220,7 +225,7 @@ export async function GET(req: Request) {
 
     const { data: projectsRaw, error: projectsErr } = await supa
       .from("projects")
-      .select("id,name")
+      .select("id,name,budget_hours,budget_amount,budget_currency")
       .eq("org_id", profile.org_id)
       .order("name", { ascending: true });
 
@@ -250,6 +255,16 @@ export async function GET(req: Request) {
     const visibleProjectIds = new Set(visibleProjects.map((project) => project.id));
     const projectNameMap = new Map(
       visibleProjects.map((project) => [project.id, project.name || "Untitled Project"])
+    );
+    const projectBudgetMap = new Map(
+      visibleProjects.map((project: any) => [
+        project.id,
+        {
+          budget_hours: project.budget_hours == null ? null : Number(project.budget_hours),
+          budget_amount: project.budget_amount == null ? null : Number(project.budget_amount),
+          budget_currency: project.budget_currency || "USD",
+        },
+      ])
     );
 
     const allowedPeople = new Set<string>();
@@ -644,6 +659,7 @@ export async function GET(req: Request) {
 
     const projectSummaryMap = new Map<string, ProjectSummaryRow>();
     for (const row of registerRows) {
+      const budget = projectBudgetMap.get(row.project_id) || { budget_hours: null, budget_amount: null, budget_currency: row.currency || "USD" };
       const existing = projectSummaryMap.get(row.project_id) || {
         id: row.project_id,
         project_id: row.project_id,
@@ -657,6 +673,11 @@ export async function GET(req: Request) {
         payment_status: "awaiting_export" as const,
         paid_amount: 0,
         receipt_count: 0,
+        budget_hours: budget.budget_hours,
+        budget_amount: budget.budget_amount,
+        budget_currency: budget.budget_currency || row.currency || "USD",
+        hours_variance: null,
+        amount_variance: null,
       };
 
       existing.period_count += 1;
@@ -692,6 +713,8 @@ export async function GET(req: Request) {
     const projectSummary = Array.from(projectSummaryMap.values())
       .map((row) => {
         delete (row as any)._contractorIds;
+        row.hours_variance = row.budget_hours != null ? row.total_hours - row.budget_hours : null;
+        row.amount_variance = row.budget_amount != null ? row.total_amount - row.budget_amount : null;
         return row;
       })
       .sort((a, b) => b.total_amount - a.total_amount);
