@@ -177,6 +177,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
         previousEntryQuery,
         contractorQuery,
         runQuery,
+        budgetQuery,
         fetchSummary(startDate, endDate),
         fetchSummary(previousRange.start, previousRange.end),
         lockPromise,
