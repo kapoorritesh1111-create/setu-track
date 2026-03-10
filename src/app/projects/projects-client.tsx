@@ -18,6 +18,8 @@ import DateRangeToolbar from "../../components/ui/DateRangeToolbar";
 import { SummaryBar } from "../../components/ui/SummaryBar";
 import { StatCard } from "../../components/ui/StatCard";
 import { presetLabel, presetToRange, type DatePreset } from "../../lib/dateRanges";
+import { formatMoney, formatDateRange } from "../../lib/format";
+import { getProjectRiskSummary } from "../../lib/opsNotifications";
 
 type WeekStart = "sunday" | "monday";
 type ActiveFilter = "all" | "active" | "inactive";
@@ -81,11 +83,7 @@ function rangeLabel(start: string, end: string) {
   const endDate = new Date(`${end}T00:00:00`);
   const sameMonth = startDate.getFullYear() === endDate.getFullYear() && startDate.getMonth() === endDate.getMonth();
   if (sameMonth) return startDate.toLocaleString("en-US", { month: "long", year: "numeric" });
-  return `${startDate.toLocaleString("en-US", { month: "short", day: "numeric" })} → ${endDate.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-}
-
-function money(amount: number, currency = "USD") {
-  return `${currency} ${Number(amount || 0).toFixed(2)}`;
+  return formatDateRange(start, end);
 }
 
 function budgetHealthTone(variance: number, hasBudget: boolean): "success" | "warn" | "default" {
@@ -503,6 +501,44 @@ function closeCreate() {
     return { rows, totals };
   }, [filteredProjects, actualsMap]);
 
+
+  const projectRiskStrip = useMemo(() => {
+    const projectRows = filteredProjects.map((project) => {
+      const actual = actualsMap[project.id] || { hours: 0, amount: 0, pending: 0 };
+      return {
+        user_id: "",
+        entry_date: rangeEnd,
+        status: actual.pending > 0 ? "submitted" : "approved",
+        hours_worked: actual.hours,
+        hourly_rate_snapshot: actual.hours > 0 ? actual.amount / Math.max(actual.hours, 1) : 0,
+        project_id: project.id,
+        project_name: project.name,
+      };
+    });
+    const budgets = filteredProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      budget_amount: Number(project.budget_amount || 0),
+      budget_hours: Number(project.budget_hours || 0),
+      budget_currency: project.budget_currency || "USD",
+    }));
+    return getProjectRiskSummary(projectRows, budgets);
+  }, [filteredProjects, actualsMap, rangeEnd]);
+
+  const riskProjects = useMemo(() => {
+    return financeSummary.rows
+      .filter((row) => row.budgetAmount > 0 || row.budgetHours > 0)
+      .map((row) => {
+        const amountRatio = row.budgetAmount > 0 ? row.actualAmount / row.budgetAmount : 0;
+        const hoursRatio = row.budgetHours > 0 ? row.actualHours / row.budgetHours : 0;
+        const ratio = Math.max(amountRatio, hoursRatio);
+        return { ...row, ratio, state: budgetHealthState(row.actualAmount, row.budgetAmount, row.actualHours, row.budgetHours) };
+      })
+      .filter((row) => row.state === "over" || row.state === "near")
+      .sort((a, b) => b.ratio - a.ratio)
+      .slice(0, 4);
+  }, [financeSummary]);
+
   function exportCsv() {
     const header = ["name", "project_id", "is_active"].join(",");
     const lines = filteredProjects.map((p) => {
@@ -888,6 +924,7 @@ function closeCreate() {
 
   const headerRight = (
     <div className="prHeaderRight">
+      <a className="pill" href="/admin/notifications">Notifications</a>
       <span className="badge">{counts.active} active</span>
       <span className="badge">{counts.inactive} inactive</span>
       <span className="badge">{counts.total} total</span>
@@ -938,12 +975,12 @@ function closeCreate() {
           />
           <StatCard
             label="Actual labor"
-            value={money(financeSummary.totals.actualAmount)}
+            value={formatMoney(financeSummary.totals.actualAmount)}
             hint={`${financeSummary.totals.actualHours.toFixed(2)} hours logged in ${presetLabel(preset, rangeStart, rangeEnd).toLowerCase()}.`}
           />
           <StatCard
             label="Budget variance"
-            value={financeSummary.totals.budgetAmount > 0 ? money(financeSummary.totals.budgetAmount - financeSummary.totals.actualAmount) : "—"}
+            value={financeSummary.totals.budgetAmount > 0 ? formatMoney(financeSummary.totals.budgetAmount - financeSummary.totals.actualAmount) : "—"}
             hint={financeSummary.totals.budgetAmount > 0 || financeSummary.totals.budgetHours > 0 ? `${financeSummary.totals.overBudgetProjects} over budget • ${financeSummary.totals.nearBudgetProjects} near budget.` : "Add budgets to turn projects into a finance workspace."}
           />
           <StatCard
@@ -972,6 +1009,63 @@ function closeCreate() {
             compact
           />
         </div>
+
+        <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
+          <div className="setuSignalCard">
+            <div className="setuSignalLabel">Projects at risk</div>
+            <strong>{projectRiskStrip.over.length + projectRiskStrip.near.length}</strong>
+            <span>{projectRiskStrip.over.length} over budget and {projectRiskStrip.near.length} nearing budget limits.</span>
+          </div>
+          <div className="setuSignalCard">
+            <div className="setuSignalLabel">Actual vs budget</div>
+            <strong>{financeSummary.totals.budgetAmount > 0 ? `${Math.min(999, (financeSummary.totals.actualAmount / financeSummary.totals.budgetAmount) * 100).toFixed(0)}%` : '—'}</strong>
+            <span>{financeSummary.totals.budgetAmount > 0 ? `${formatMoney(financeSummary.totals.actualAmount)} of ${formatMoney(financeSummary.totals.budgetAmount)} used` : 'Set budget amounts to unlock spend progress.'}</span>
+          </div>
+          <div className="setuSignalCard">
+            <div className="setuSignalLabel">Hours vs plan</div>
+            <strong>{financeSummary.totals.budgetHours > 0 ? `${Math.min(999, (financeSummary.totals.actualHours / financeSummary.totals.budgetHours) * 100).toFixed(0)}%` : '—'}</strong>
+            <span>{financeSummary.totals.budgetHours > 0 ? `${financeSummary.totals.actualHours.toFixed(1)} / ${financeSummary.totals.budgetHours.toFixed(1)} budgeted hours` : 'Hour budgets are still missing on most projects.'}</span>
+          </div>
+          <div className="setuSignalCard">
+            <div className="setuSignalLabel">No-budget projects</div>
+            <strong>{financeSummary.totals.noBudgetProjects}</strong>
+            <span>These projects are active but cannot yet be monitored for burn or variance.</span>
+          </div>
+        </div>
+
+        <div className="card cardPad" style={{ marginBottom: 14 }}>
+          <div className="setuCardHeaderRow" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="setuSectionTitle" style={{ fontSize: 18 }}>Budget risk strip</div>
+              <div className="setuSectionHint">Jump straight into the projects that need budget action, approval tightening, or baseline cleanup.</div>
+            </div>
+          </div>
+          <div className="setuFocusList">
+            <button className="setuFocusItem" onClick={() => setHealthFilter('over')}><span>Over budget</span><strong>{projectRiskStrip.over.length}</strong></button>
+            <button className="setuFocusItem" onClick={() => setHealthFilter('near')}><span>Near budget</span><strong>{projectRiskStrip.near.length}</strong></button>
+            <button className="setuFocusItem" onClick={() => setHealthFilter('no_budget')}><span>No budget set</span><strong>{projectRiskStrip.noBudget.length}</strong></button>
+            <button className="setuFocusItem" onClick={() => setHealthFilter('all')}><span>Return to all</span><strong>{filteredProjects.length}</strong></button>
+          </div>
+        </div>
+
+        {riskProjects.length ? (
+          <div className="card cardPad" style={{ marginBottom: 14 }}>
+            <div className="setuCardHeaderRow" style={{ marginBottom: 12 }}>
+              <div>
+                <div className="setuSectionTitle" style={{ fontSize: 18 }}>Top projects at risk</div>
+                <div className="setuSectionHint">Use this queue to triage spend, tighten approvals, or adjust budget baselines.</div>
+              </div>
+            </div>
+            <div className="setuBarsList">
+              {riskProjects.map((project) => (
+                <button key={project.id} className="setuFocusItem" onClick={() => openDrawer(project.id)}>
+                  <span>{project.name}</span>
+                  <strong>{project.state === 'over' ? 'Over' : 'Near'}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <CommandBar
           views={
@@ -1172,7 +1266,7 @@ function closeCreate() {
                 const hasBudget = Number(p.budget_amount || 0) > 0 || Number(p.budget_hours || 0) > 0;
                 return (
                   <div style={{ display: "grid", gap: 4 }}>
-                    <strong>{hasBudget ? money(Number(p.budget_amount || 0), p.budget_currency || "USD") : "—"}</strong>
+                    <strong>{hasBudget ? formatMoney(Number(p.budget_amount || 0), p.budget_currency || "USD") : "—"}</strong>
                     <div className="muted" style={{ fontSize: 12 }}>{Number(p.budget_hours || 0) > 0 ? `${Number(p.budget_hours || 0).toFixed(0)} hrs planned` : "No hour target"}</div>
                   </div>
                 );
@@ -1184,10 +1278,21 @@ function closeCreate() {
               width: 190,
               cell: (p) => {
                 const actual = actualsMap[p.id] || { hours: 0, amount: 0, pending: 0 };
+                const amountPct = Number(p.budget_amount || 0) > 0 ? Math.min(999, (actual.amount / Number(p.budget_amount || 0)) * 100) : 0;
+                const hoursPct = Number(p.budget_hours || 0) > 0 ? Math.min(999, (actual.hours / Number(p.budget_hours || 0)) * 100) : 0;
                 return (
-                  <div style={{ display: "grid", gap: 4 }}>
-                    <strong>{money(actual.amount, p.budget_currency || "USD")}</strong>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <strong>{formatMoney(actual.amount, p.budget_currency || "USD")}</strong>
                     <div className="muted" style={{ fontSize: 12 }}>{actual.hours.toFixed(2)} hrs • {actual.pending} pending</div>
+                    {Number(p.budget_amount || 0) > 0 ? (
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <div style={{ height: 6, borderRadius: 999, background: "var(--border-soft, rgba(148,163,184,0.18))", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(amountPct, 100)}%`, background: amountPct >= 100 ? "var(--danger-600, #dc2626)" : amountPct >= 80 ? "var(--warning-600, #d97706)" : "var(--brand-600, #2563eb)" }} />
+                        </div>
+                        <div className="muted" style={{ fontSize: 11 }}>Spend burn {amountPct.toFixed(0)}%</div>
+                      </div>
+                    ) : null}
+                    {Number(p.budget_hours || 0) > 0 ? <div className="muted" style={{ fontSize: 11 }}>Hours burn {hoursPct.toFixed(0)}%</div> : null}
                   </div>
                 );
               },
@@ -1202,12 +1307,14 @@ function closeCreate() {
                 const budgetHours = Number(p.budget_hours || 0);
                 const variance = budgetAmount > 0 ? actual.amount - budgetAmount : 0;
                 const state = budgetHealthState(actual.amount, budgetAmount, actual.hours, budgetHours);
-                const tone = state === "over" ? "warn" : state === "within" ? "success" : "default";
-                const detail = budgetAmount > 0 ? `${variance > 0 ? "+" : ""}${money(variance, p.budget_currency || "USD")}` : budgetHours > 0 ? `${(actual.hours - budgetHours).toFixed(2)} hrs vs plan` : "Add budget to compare";
+                const tone = state === "over" ? "warn" : state === "within" ? "success" : state === "near" ? "warn" : "default";
+                const detail = budgetAmount > 0 ? `${variance > 0 ? "+" : ""}${formatMoney(variance, p.budget_currency || "USD")}` : budgetHours > 0 ? `${(actual.hours - budgetHours).toFixed(2)} hrs vs plan` : "Add budget to compare";
+                const riskCopy = state === "over" ? "Immediate budget action" : state === "near" ? "Watch next approvals" : state === "within" ? "Healthy burn" : "Budget baseline missing";
                 return (
                   <div style={{ display: "grid", gap: 6 }}>
                     <Tag tone={tone}>{budgetHealthCopy(state)}</Tag>
                     <div className="muted" style={{ fontSize: 12 }}>{detail}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>{riskCopy}</div>
                   </div>
                 );
               },
@@ -1347,7 +1454,7 @@ function closeCreate() {
                       />
                     ) : (
                       <div id={id} aria-describedby={describedBy} style={{ padding: "10px 12px" }}>
-                        {drawerProject.budget_amount != null ? money(Number(drawerProject.budget_amount || 0), drawerProject.budget_currency || "USD") : "No budget set"}
+                        {drawerProject.budget_amount != null ? formatMoney(Number(drawerProject.budget_amount || 0), drawerProject.budget_currency || "USD") : "No budget set"}
                       </div>
                     )
                   }
@@ -1386,10 +1493,10 @@ function closeCreate() {
                 <div className="card cardPad" style={{ boxShadow: "none", background: "var(--panel)" }}>
                   <div style={{ fontWeight: 900, marginBottom: 6 }}>Project finance in {rangeLabel(rangeStart, rangeEnd)}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    Actual {money((actualsMap[drawerProject.id]?.amount || 0), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.hours || 0).toFixed(2)} hrs
+                    Actual {formatMoney((actualsMap[drawerProject.id]?.amount || 0), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.hours || 0).toFixed(2)} hrs
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    Forecast {money((actualsMap[drawerProject.id]?.amount || 0) + ((actualsMap[drawerProject.id]?.pending || 0) * (((actualsMap[drawerProject.id]?.hours || 0) > 0 ? (actualsMap[drawerProject.id]?.amount || 0) / Math.max((actualsMap[drawerProject.id]?.hours || 0), 1) : 0))), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.pending || 0)} pending entries
+                    Forecast {formatMoney((actualsMap[drawerProject.id]?.amount || 0) + ((actualsMap[drawerProject.id]?.pending || 0) * (((actualsMap[drawerProject.id]?.hours || 0) > 0 ? (actualsMap[drawerProject.id]?.amount || 0) / Math.max((actualsMap[drawerProject.id]?.hours || 0), 1) : 0))), drawerProject.budget_currency || "USD")} • {(actualsMap[drawerProject.id]?.pending || 0)} pending entries
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
                     {budgetHealthLabel((actualsMap[drawerProject.id]?.amount || 0) - Number(drawerProject.budget_amount || 0), Number(drawerProject.budget_amount || 0) > 0)}

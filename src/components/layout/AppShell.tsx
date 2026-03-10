@@ -21,6 +21,8 @@ import {
   CreditCard,
   Building2,
   ChartColumnBig,
+  BellRing,
+  ChevronDown,
 } from "lucide-react";
 
 type Props = {
@@ -64,6 +66,12 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    Operations: true,
+    Organization: false,
+    Finance: false,
+    Admin: false,
+  });
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const role = profile?.role || "user";
@@ -99,6 +107,7 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
       {
         label: "Admin",
         items: [
+          { label: "Notifications", href: "/admin/notifications", icon: <BellRing size={16} />, hideIf: (r: string) => r === "contractor" },
           { label: "Activity", href: "/admin/activity", icon: <Shield size={16} />, hideIf: (r: string) => r !== "admin" },
           { label: "Exports", href: "/admin/exports", icon: <Shield size={16} />, hideIf: (r: string) => r !== "admin" },
           { label: "Org Settings", href: "/admin/org-settings", icon: <Building2 size={16} />, hideIf: (r: string) => r !== "admin" },
@@ -124,6 +133,18 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
     setMenuOpen(false);
     router.push(href);
   }
+  function toggleSection(label: string) {
+    setExpandedSections((current) => ({ ...current, [label]: !current[label] }));
+  }
+
+  function sectionIsActive(section: NavSection) {
+    return section.items.some((item) => isActive(item.href));
+  }
+
+  function sectionIsExpanded(section: NavSection) {
+    return expandedSections[section.label] || sectionIsActive(section);
+  }
+
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -138,6 +159,13 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+  useEffect(() => {
+    if (!pathname) return;
+    const activeSection = navSections.find((section) => section.items.some((item) => isActive(item.href)));
+    if (!activeSection) return;
+    setExpandedSections((current) => ({ ...current, [activeSection.label]: true }));
+  }, [pathname, navSections]);
+
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -272,23 +300,35 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
           </button>
         </div>
 
-        {navSections.map((section) => (
-          <div className="mwSideSection" key={section.label}>
-            <div className="mwMenuTitle">{section.label}</div>
-            {section.items.map((item) => (
+        {navSections.map((section) => {
+          const expanded = sectionIsExpanded(section);
+          const active = sectionIsActive(section);
+          return (
+            <div className="mwSideSection" key={section.label}>
               <button
-                key={item.href}
                 type="button"
-                className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
-                onClick={() => go(item.href)}
-                aria-current={isActive(item.href) ? "page" : undefined}
+                className={`mwSideSectionToggle ${active ? "mwSideSectionToggleActive" : ""}`}
+                onClick={() => toggleSection(section.label)}
+                aria-expanded={expanded}
               >
-                <span className="mwSideItemIcon">{item.icon}</span>
-                <span>{item.label}</span>
+                <span>{section.label}</span>
+                <ChevronDown size={14} className={`mwSideSectionChevron ${expanded ? "isOpen" : ""}`} />
               </button>
-            ))}
-          </div>
-        ))}
+              {expanded ? section.items.map((item) => (
+                <button
+                  key={item.href}
+                  type="button"
+                  className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
+                  onClick={() => go(item.href)}
+                  aria-current={isActive(item.href) ? "page" : undefined}
+                >
+                  <span className="mwSideItemIcon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              )) : null}
+            </div>
+          );
+        })}
       </aside>
 
       {mobileOpen && (
@@ -323,23 +363,35 @@ export default function AppShell({ title, subtitle, right, children }: Props) {
 
             <div className="mwMenuTitle">Navigate</div>
 
-            {navSections.map((section) => (
-              <div className="mwSideSection" key={section.label}>
-                <div className="mwMenuTitle">{section.label}</div>
-                {section.items.map((item) => (
+            {navSections.map((section) => {
+              const expanded = sectionIsExpanded(section);
+              const active = sectionIsActive(section);
+              return (
+                <div className="mwSideSection" key={section.label}>
                   <button
-                    key={item.href}
                     type="button"
-                    className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
-                    onClick={() => go(item.href)}
-                    aria-current={isActive(item.href) ? "page" : undefined}
+                    className={`mwSideSectionToggle ${active ? "mwSideSectionToggleActive" : ""}`}
+                    onClick={() => toggleSection(section.label)}
+                    aria-expanded={expanded}
                   >
-                    <span className="mwSideItemIcon">{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span>{section.label}</span>
+                    <ChevronDown size={14} className={`mwSideSectionChevron ${expanded ? "isOpen" : ""}`} />
                   </button>
-                ))}
-              </div>
-            ))}
+                  {expanded ? section.items.map((item) => (
+                    <button
+                      key={item.href}
+                      type="button"
+                      className={`mwSideItem ${isActive(item.href) ? "mwSideItemActive" : ""}`}
+                      onClick={() => go(item.href)}
+                      aria-current={isActive(item.href) ? "page" : undefined}
+                    >
+                      <span className="mwSideItemIcon">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  )) : null}
+                </div>
+              );
+            })}
 
             <div className="mwDrawerAccount">
               <div className="mwMenuTitle">Account</div>

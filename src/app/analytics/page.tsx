@@ -11,6 +11,8 @@ import LoadingState from "../../components/ui/LoadingState";
 import ErrorState from "../../components/ui/ErrorState";
 import { supabase } from "../../lib/supabaseBrowser";
 import { presetToRange, previousRangeFor, presetLabel, type DatePreset } from "../../lib/dateRanges";
+import { formatDateTime, formatMoney } from "../../lib/format";
+import { buildOpsNotifications, severityLabel } from "../../lib/opsNotifications";
 import { useProfile } from "../../lib/useProfile";
 
 type EntryRow = {
@@ -38,12 +40,19 @@ type PayrollRun = {
 
 type ProjectBudget = {
   id: string;
+  name?: string | null;
   budget_hours: number | null;
   budget_amount: number | null;
   budget_currency: string | null;
 };
 
-function money(value: number, currency = "USD") { return `${currency} ${value.toFixed(2)}`; }
+type Contractor = {
+  id: string;
+  full_name: string | null;
+  hourly_rate: number | null;
+  is_active: boolean | null;
+};
+
 function pct(delta: number) { return `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`; }
 
 function AnalyticsPageContent() {
@@ -56,6 +65,7 @@ function AnalyticsPageContent() {
   const [rows, setRows] = useState<EntryRow[]>([]);
   const [previousRows, setPreviousRows] = useState<EntryRow[]>([]);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [projectBudgets, setProjectBudgets] = useState<Record<string, ProjectBudget>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
@@ -97,11 +107,19 @@ function AnalyticsPageContent() {
 
       const budgetQuery = supabase
         .from("projects")
-        .select("id, budget_hours, budget_amount, budget_currency")
+        .select("id, name, budget_hours, budget_amount, budget_currency")
         .eq("org_id", profile.org_id);
 
-      const [{ data: current, error: currentError }, { data: previous, error: previousError }, { data: payrollRuns, error: runError }, { data: budgetRows, error: budgetError }] = await Promise.all([currentQuery, previousQuery, runQuery, budgetQuery]);
-      if (currentError || previousError || runError || budgetError) throw new Error(currentError?.message || previousError?.message || runError?.message || budgetError?.message || "Failed to load analytics");
+      const contractorQuery = supabase
+        .from("profiles")
+        .select("id, full_name, hourly_rate, is_active")
+        .eq("org_id", profile.org_id)
+        .eq("role", "contractor")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true });
+
+      const [{ data: current, error: currentError }, { data: previous, error: previousError }, { data: payrollRuns, error: runError }, { data: budgetRows, error: budgetError }, { data: contractorRows, error: contractorError }] = await Promise.all([currentQuery, previousQuery, runQuery, budgetQuery, contractorQuery]);
+      if (currentError || previousError || runError || budgetError || contractorError) throw new Error(currentError?.message || previousError?.message || runError?.message || budgetError?.message || contractorError?.message || "Failed to load analytics");
 
       const restrict = profile.role === "contractor"
         ? (list: EntryRow[]) => list.filter((row) => row.user_id === userId)
@@ -112,12 +130,14 @@ function AnalyticsPageContent() {
       setRows(restrict((current || []) as EntryRow[]));
       setPreviousRows(restrict((previous || []) as EntryRow[]));
       setRuns((payrollRuns || []) as PayrollRun[]);
-      setProjectBudgets(Object.fromEntries(((budgetRows || []) as any[]).map((row) => [row.id, row])));
+      setContractors((contractorRows || []) as Contractor[]);
+      setProjectBudgets(Object.fromEntries(((budgetRows || []) as ProjectBudget[]).map((row) => [row.id, row])));
     } catch (e: any) {
       setError(e?.message || "Failed to load analytics.");
       setRows([]);
       setPreviousRows([]);
       setRuns([]);
+      setContractors([]);
       setProjectBudgets({});
     } finally {
       setBusy(false);
@@ -173,9 +193,17 @@ function AnalyticsPageContent() {
       byPersonMap.set(key, current);
     }
     const byPerson = Array.from(byPersonMap.values()).sort((a,b) => b.hours - a.hours).slice(0, 5);
+    const contractorConcentration = totalCost > 0 ? ((byPerson.slice(0, 3).reduce((sum, item) => sum + item.cost, 0) / totalCost) * 100) : 0;
+    const opsNotifications = buildOpsNotifications({
+      contractors,
+      rows,
+      budgets: Object.values(projectBudgets),
+      periodLocked: runs.some((run) => run.period_start === start && run.period_end === end && run.status === "locked"),
+      exportsCount: 0,
+    });
 
-    return { totalHours, approvedHours, submittedHours, totalCost, people, projects, hoursDelta, costDelta, byProject, byPerson, budgetedProjects: budgetedProjects.length, overBudgetProjects: overBudgetProjects.length, nearBudgetProjects: nearBudgetProjects.length, totalBudgetAmount, pendingForecast, projectedPayroll, staleApprovals };
-  }, [rows, previousRows, projectBudgets]);
+    return { totalHours, approvedHours, submittedHours, totalCost, people, projects, hoursDelta, costDelta, byProject, byPerson, contractorConcentration, budgetedProjects: budgetedProjects.length, overBudgetProjects: overBudgetProjects.length, nearBudgetProjects: nearBudgetProjects.length, totalBudgetAmount, pendingForecast, projectedPayroll, staleApprovals, opsNotifications };
+  }, [contractors, end, projectBudgets, rows, previousRows, runs, start]);
 
   const barMax = Math.max(1, ...summary.byProject.map((item) => item.cost), ...summary.byPerson.map((item) => item.hours));
 
@@ -214,23 +242,54 @@ function AnalyticsPageContent() {
           ) : (
             <>
               <div className="analyticsKpis">
-                <div className="setuMetricCard"><div className="setuMetricLabel">Total labor cost</div><div className="setuMetricValue">{money(summary.totalCost)}</div><div className={`setuMetricHint ${summary.costDelta >= 0 ? "analyticsDeltaPositive" : "analyticsDeltaNegative"}`}>{pct(summary.costDelta)} vs prior range</div></div>
+                <div className="setuMetricCard"><div className="setuMetricLabel">Total labor cost</div><div className="setuMetricValue">{formatMoney(summary.totalCost)}</div><div className={`setuMetricHint ${summary.costDelta >= 0 ? "analyticsDeltaPositive" : "analyticsDeltaNegative"}`}>{pct(summary.costDelta)} vs prior range</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Tracked hours</div><div className="setuMetricValue">{summary.totalHours.toFixed(2)}</div><div className={`setuMetricHint ${summary.hoursDelta >= 0 ? "analyticsDeltaPositive" : "analyticsDeltaNegative"}`}>{pct(summary.hoursDelta)} vs prior range</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Approved hours</div><div className="setuMetricValue">{summary.approvedHours.toFixed(2)}</div><div className="setuMetricHint">{summary.submittedHours.toFixed(2)} hrs still awaiting review</div></div>
-                <div className="setuMetricCard"><div className="setuMetricLabel">Projected payroll</div><div className="setuMetricValue">{money(summary.projectedPayroll)}</div><div className="setuMetricHint">{money(summary.pendingForecast)} pending approvals still to forecast.</div></div>
+                <div className="setuMetricCard"><div className="setuMetricLabel">Projected payroll</div><div className="setuMetricValue">{formatMoney(summary.projectedPayroll)}</div><div className="setuMetricHint">{formatMoney(summary.pendingForecast)} pending approvals still to forecast.</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Coverage</div><div className="setuMetricValue">{summary.people} people</div><div className="setuMetricHint">Across {summary.projects} active projects in {presetLabel(preset, start, end).toLowerCase()}.</div></div>
                 <div className="setuMetricCard"><div className="setuMetricLabel">Operations alerts</div><div className="setuMetricValue">{summary.overBudgetProjects + summary.nearBudgetProjects + summary.staleApprovals}</div><div className="setuMetricHint">{summary.overBudgetProjects} over budget • {summary.staleApprovals} stale approvals.</div></div>
               </div>
 
+              <div className="setuSignalGrid" style={{ marginBottom: 18 }}>
+                <div className="setuSignalCard">
+                  <div className="setuSignalLabel">Payroll variance</div>
+                  <strong>{pct(summary.costDelta)}</strong>
+                  <span>{formatMoney(summary.totalCost)} in the selected range versus the prior period.</span>
+                </div>
+                <div className="setuSignalCard">
+                  <div className="setuSignalLabel">Contractor concentration</div>
+                  <strong>{summary.contractorConcentration.toFixed(0)}%</strong>
+                  <span>Top three contributors account for this share of labor spend.</span>
+                </div>
+                <div className="setuSignalCard">
+                  <div className="setuSignalLabel">Project risk</div>
+                  <strong>{summary.overBudgetProjects + summary.nearBudgetProjects}</strong>
+                  <span>{summary.overBudgetProjects} over budget and {summary.nearBudgetProjects} approaching budget.</span>
+                </div>
+                <div className="setuSignalCard">
+                  <div className="setuSignalLabel">Budget coverage</div>
+                  <strong>{summary.totalBudgetAmount > 0 ? `${Math.min(999, (summary.totalCost / summary.totalBudgetAmount) * 100).toFixed(0)}%` : '—'}</strong>
+                  <span>{summary.totalBudgetAmount > 0 ? `${formatMoney(summary.totalCost)} against ${formatMoney(summary.totalBudgetAmount)} budgeted labor` : 'Project budgets are still sparse.'}</span>
+                </div>
+              </div>
+
               <div className="analyticsSplit">
                 <div className="analyticsPanel">
+                  <div className="setuCardHeaderRow"><div><div className="setuSectionTitle" style={{ fontSize: 20 }}>Actionable signals</div><div className="setuSectionHint">Shared ops signals from the command center, kept route-safe inside the existing analytics workspace.</div></div><Button variant="secondary" onClick={() => (window.location.href = "/dashboard")}>Dashboard</Button></div>
+                  <div className="setuFocusList" style={{ marginBottom: 18 }}>
+                    {summary.opsNotifications.length ? summary.opsNotifications.slice(0, 4).map((item) => (
+                      <button className="setuFocusItem" key={item.id} onClick={() => (window.location.href = item.href)}><span>{item.title}</span><strong>{severityLabel(item.severity)} • {item.metric}</strong></button>
+                    )) : (
+                      <button className="setuFocusItem" onClick={() => (window.location.href = "/reports/payroll")}><span>Payroll workspace</span><strong>Stable</strong></button>
+                    )}
+                  </div>
                   <div className="setuCardHeaderRow"><div><div className="setuSectionTitle" style={{ fontSize: 20 }}>Project labor mix</div><div className="setuSectionHint">Budget-aware labor mix for the same project health layer used by the command center.</div></div><Button variant="secondary" onClick={() => (window.location.href = "/projects")}>Projects</Button></div>
                   <div className="analyticsBars">
                     {summary.byProject.map((item) => (
                       <div className="analyticsBarItem" key={item.id}>
-                        <div className="analyticsBarHead"><span>{item.name}</span><span>{money(item.cost)} · {item.hours.toFixed(2)} hrs</span></div>
+                        <div className="analyticsBarHead"><span>{item.name}</span><span>{formatMoney(item.cost)} · {item.hours.toFixed(2)} hrs</span></div>
                         <div className="analyticsBarTrack"><div className="analyticsBarFill" style={{ width: `${Math.max(8, (item.cost / barMax) * 100)}%` }} /></div>
-                        <div className="muted" style={{ fontSize: 12 }}>{item.pending} pending approvals • {item.budgetAmount > 0 ? `${item.cost > item.budgetAmount ? "over" : "within"} ${money(item.budgetAmount, item.currency)} budget` : "no budget"}</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{item.pending} pending approvals • {item.budgetAmount > 0 ? `${item.cost > item.budgetAmount ? "over" : "within"} ${formatMoney(item.budgetAmount, item.currency)} budget` : "no budget"}</div>
                       </div>
                     ))}
                   </div>
@@ -243,7 +302,7 @@ function AnalyticsPageContent() {
                       <div className="analyticsBarItem" key={item.id}>
                         <div className="analyticsBarHead"><span>{item.name}</span><span>{item.hours.toFixed(2)} hrs</span></div>
                         <div className="analyticsBarTrack"><div className="analyticsBarFill" style={{ width: `${Math.max(8, (item.hours / barMax) * 100)}%` }} /></div>
-                        <div className="muted" style={{ fontSize: 12 }}>{money(item.cost)} labor cost</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{formatMoney(item.cost)} labor cost</div>
                       </div>
                     ))}
                   </div>
@@ -262,8 +321,8 @@ function AnalyticsPageContent() {
                             <td>{run.period_start} → {run.period_end}</td>
                             <td><span className={`pill ${run.status === "paid" ? "ok" : run.status === "locked" ? "warn" : ""}`}>{run.status || "open"}</span></td>
                             <td>{Number(run.total_hours || 0).toFixed(2)}</td>
-                            <td>{money(Number(run.total_amount || 0))}</td>
-                            <td>{run.created_at ? new Date(run.created_at).toLocaleString() : "—"}</td>
+                            <td>{formatMoney(Number(run.total_amount || 0))}</td>
+                            <td>{run.created_at ? formatDateTime(run.created_at) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -277,12 +336,22 @@ function AnalyticsPageContent() {
                     <div className="setuMetricCard"><div className="setuMetricLabel">Budgeted projects</div><div className="setuMetricValue">{summary.budgetedProjects}</div><div className="setuMetricHint">Projects with amount or hour targets in this range.</div></div>
                     <div className="setuMetricCard"><div className="setuMetricLabel">Over budget</div><div className="setuMetricValue">{summary.overBudgetProjects}</div><div className="setuMetricHint">Needs manager attention now.</div></div>
                     <div className="setuMetricCard"><div className="setuMetricLabel">Near budget</div><div className="setuMetricValue">{summary.nearBudgetProjects}</div><div className="setuMetricHint">Within the 80–99% warning zone.</div></div>
-                    <div className="setuMetricCard"><div className="setuMetricLabel">Budget capacity</div><div className="setuMetricValue">{summary.totalBudgetAmount > 0 ? money(summary.totalBudgetAmount) : "—"}</div><div className="setuMetricHint">Compared to {money(summary.totalCost)} actual labor.</div></div>
+                    <div className="setuMetricCard"><div className="setuMetricLabel">Budget capacity</div><div className="setuMetricValue">{summary.totalBudgetAmount > 0 ? formatMoney(summary.totalBudgetAmount) : "—"}</div><div className="setuMetricHint">Compared to {formatMoney(summary.totalCost)} actual labor.</div></div>
                   </div>
+                  {summary.byProject.filter((item) => item.pending > 0 || (item.budgetAmount > 0 && item.cost >= item.budgetAmount * 0.8)).length ? (
+                    <div className="setuBarsList" style={{ marginBottom: 14 }}>
+                      {summary.byProject.filter((item) => item.pending > 0 || (item.budgetAmount > 0 && item.cost >= item.budgetAmount * 0.8)).map((item) => (
+                        <div className="setuBarBlock" key={item.id}>
+                          <div className="setuBarHead"><span>{item.name}</span><span>{item.pending} pending • {formatMoney(item.cost)}</span></div>
+                          <div className="setuProjectMeta">{item.budgetAmount > 0 ? `${Math.min(999, (item.cost / Math.max(item.budgetAmount, 1)) * 100).toFixed(0)}% of budget used` : 'No budget baseline yet'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="setuFocusList">
                     <button className="setuFocusItem" onClick={() => (window.location.href = "/dashboard")}><span>Command Center</span><strong>Open</strong></button>
                     <button className="setuFocusItem" onClick={() => (window.location.href = "/approvals?scope=all")}><span>Approvals queue</span><strong>{summary.submittedHours.toFixed(2)} hrs</strong></button>
-                    <button className="setuFocusItem" onClick={() => (window.location.href = `/reports/payroll?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)}><span>Payroll report</span><strong>{money(summary.totalCost)}</strong></button>
+                    <button className="setuFocusItem" onClick={() => (window.location.href = `/reports/payroll?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)}><span>Payroll report</span><strong>{formatMoney(summary.totalCost)}</strong></button>
                   </div>
                 </div>
               </div>

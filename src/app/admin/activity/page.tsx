@@ -11,15 +11,7 @@ import { useProfile } from "../../../lib/useProfile";
 import { getActivityData, type ActivityAuditRow as AuditRow, type ActivityExportRow as ExportEvent, type ActivityPayrollRunRow as PayrollRun } from "../../../lib/data/activityData";
 import ActivityEventRow from "../../../components/activity/ActivityEventRow";
 import { activityTitle, formatActivityDetail, humanizeActivityVerb, activityTone } from "../../../lib/activityPresentation";
-
-function formatWhen(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : "—";
-}
-
-function formatMoney(value?: number | null) {
-  return `USD ${Number(value || 0).toFixed(2)}`;
-}
-
+import { formatDateTime, formatMoney } from "../../../lib/format";
 
 
 function metadataLabel(metadata?: Record<string, unknown> | null) {
@@ -82,6 +74,12 @@ function AdminActivityInner() {
         <div className="setuMetricCard"><div className="setuMetricLabel">Payroll runs</div><div className="setuMetricValue">{runRows.length}</div><div className="setuMetricHint">Recent locked, paid, or voided snapshots.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Latest run amount</div><div className="setuMetricValue">{runRows[0] ? formatMoney(runRows[0].total_amount) : "—"}</div><div className="setuMetricHint">Latest payroll run from the timeline.</div></div>
       </div>
+      <div className="setuSignalGrid" style={{ marginBottom: 16 }}>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Timeline health</div><strong>{auditRows.length + exportRows.length + runRows.length}</strong><span>Unified audit, export, and payroll events visible from one operational workspace.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Latest payroll status</div><strong>{runRows[0]?.status || '—'}</strong><span>{runRows[0] ? `${formatMoney(runRows[0].total_amount)} in the latest run.` : 'No payroll runs recorded yet.'}</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Latest export</div><strong>{exportRows[0]?.export_type || '—'}</strong><span>{exportRows[0] ? formatDateTime(exportRows[0].created_at) : 'No export history in this workspace yet.'}</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Actor coverage</div><strong>{new Set(auditRows.map((row) => row.actor_name || row.actor_id || 'system')).size}</strong><span>Distinct actors captured in the audit stream.</span></div>
+      </div>
       {busy ? <TableSkeleton rows={6} /> : (
         <div className="setuCommandGrid">
           <section className="setuSurfaceCard">
@@ -110,7 +108,7 @@ function AdminActivityInner() {
                     <div style={{ fontWeight: 800 }}>Payroll run • {row.period_start} → {row.period_end}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{formatMoney(row.total_amount)} • {row.status || "open"}</div>
                   </div>
-                  <div className="muted" style={{ fontSize: 12 }}>{formatWhen(row.created_at)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{formatDateTime(row.created_at)}</div>
                 </div>
               ))}
               {exportRows.map((row) => (
@@ -119,7 +117,7 @@ function AdminActivityInner() {
                     <div style={{ fontWeight: 800 }}>{metadataLabel(row.metadata) || row.export_type || "Export event"}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{row.period_start || "—"} → {row.period_end || "—"}</div>
                   </div>
-                  <div className="muted" style={{ fontSize: 12 }}>{formatWhen(row.created_at)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{formatDateTime(row.created_at)}</div>
                 </div>
               ))}
             </div>

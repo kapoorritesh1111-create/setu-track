@@ -12,6 +12,7 @@ import { addDays, parseISODate, startOfWeekSunday, toISODate, weekRangeLabel } f
 import Drawer from "../../components/ui/Drawer";
 import { StatusChip } from "../../components/ui/StatusChip";
 import ActionMenu from "../../components/ui/ActionMenu";
+import { summarizeApprovalSignals } from "../../lib/opsNotifications";
 
 type EntryStatus = "draft" | "submitted" | "approved" | "rejected";
 
@@ -350,6 +351,25 @@ function ApprovalsInner() {
       .sort((a, b) => (a.week_start === b.week_start ? a.user_id.localeCompare(b.user_id) : b.week_start.localeCompare(a.week_start)));
   }, [entries, profiles, search, showAllPending, weekStartISO, weekEndISO]);
 
+  const approvalSignals = useMemo(() => {
+    const contractors = Object.values(profiles)
+      .filter((profile) => !!profile)
+      .map((profile) => ({ id: profile.id, full_name: profile.full_name, is_active: true }));
+
+    const rowsLite = entries.map((entry) => ({
+      user_id: entry.user_id,
+      full_name: entry.full_name || profiles[entry.user_id]?.full_name || null,
+      entry_date: entry.entry_date,
+      status: entry.status,
+      hours_worked: entry.hours_worked,
+      project_id: entry.project_id,
+      project_name: entry.project_name || projects[entry.project_id]?.name || null,
+    }));
+
+    const missingNotesCount = groups.filter((group) => group.entries.some((entry) => !String(entry.notes || "").trim())).length;
+    return summarizeApprovalSignals({ contractors, rows: rowsLite, missingNotesCount });
+  }, [profiles, entries, groups, projects]);
+
   const exceptionSummary = useMemo(() => {
     const stale = groups.filter((group) => ((Date.now() - new Date(`${group.week_end}T00:00:00`).getTime()) / 86400000) > 2).length;
     const missingTimesheets = Object.values(profiles).filter((profile) => !!profile && !groups.some((group) => group.user_id === profile.id)).length;
@@ -357,6 +377,14 @@ function ApprovalsInner() {
     const locked = groups.filter((group) => lockByRange[`${group.week_start}__${group.week_end}`]?.locked).length;
     return { stale, missingTimesheets, overtime, locked };
   }, [groups, profiles, lockByRange]);
+
+
+  function groupFlags(group: Group) {
+    const stale = ((Date.now() - new Date(`${group.week_end}T00:00:00`).getTime()) / 86400000) > 2;
+    const overtime = groupTotalHours(group) > 60 || groupDaysSummary(group).some(([, hours]) => hours > 10);
+    const missingNotes = group.entries.filter((entry) => !String(entry.notes || "").trim()).length;
+    return { stale, overtime, missingNotes };
+  }
 
   const visibleGroups = useMemo(() => {
     if (scope === "stale") return groups.filter((group) => ((Date.now() - new Date(`${group.week_end}T00:00:00`).getTime()) / 86400000) > 2);
@@ -439,6 +467,7 @@ useEffect(() => {
   const headerRight = (
     <div className="apHeaderRight">
       <div className="apToolbar">
+        <a className="pill" href="/admin/notifications">Notifications</a>
         <label className="apToggle">
           <input
             type="checkbox"
@@ -595,14 +624,39 @@ useEffect(() => {
         <div className="setuMetricCard"><div className="setuMetricLabel">Queue items</div><div className="setuMetricValue">{queueSummary.totalGroups}</div><div className="setuMetricHint">{queueSummary.uniquePeople} people across pending approvals</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Hours awaiting review</div><div className="setuMetricValue">{queueSummary.totalHours.toFixed(2)}</div><div className="setuMetricHint">Submitted work still pending manager signoff</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Locked ranges</div><div className="setuMetricValue">{queueSummary.lockedCount}</div><div className="setuMetricHint">Locked pay periods remain visible for context</div></div>
-        <div className="setuMetricCard"><div className="setuMetricLabel">Forecast blockers</div><div className="setuMetricValue">{exceptionSummary.stale + exceptionSummary.overtime + exceptionSummary.missingTimesheets}</div><div className="setuMetricHint">{exceptionSummary.stale} stale • {exceptionSummary.overtime} overtime • {exceptionSummary.missingTimesheets} missing</div></div>
+        <div className="setuMetricCard"><div className="setuMetricLabel">Forecast blockers</div><div className="setuMetricValue">{approvalSignals.blockerCount}</div><div className="setuMetricHint">{approvalSignals.staleRows.length} stale rows • {approvalSignals.overtimeRows.length} long-hour days • {approvalSignals.missingTimesheets.length} missing</div></div>
       </div>
 
       <div className="setuFocusList" style={{ marginBottom: 14 }}>
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=all'}><span>All approvals</span><strong>{groups.length}</strong></button>
-        <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=stale'}><span>Stale approvals</span><strong>{exceptionSummary.stale}</strong></button>
-        <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=overtime'}><span>Overtime signals</span><strong>{exceptionSummary.overtime}</strong></button>
+        <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=stale'}><span>Stale approvals</span><strong>{approvalSignals.staleRows.length}</strong></button>
+        <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=overtime'}><span>Overtime signals</span><strong>{approvalSignals.overtimeRows.length}</strong></button>
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=locked'}><span>Locked visible</span><strong>{exceptionSummary.locked}</strong></button>
+        <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=all'}><span>No-note groups</span><strong>{approvalSignals.missingNotesCount}</strong></button>
+      </div>
+
+      <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Manager queue</div><strong>{queueSummary.totalGroups}</strong><span>Grouped approvals by person and week for faster exception handling.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Stale submitted rows</div><strong>{approvalSignals.staleRows.length}</strong><span>Submitted entries older than the approval SLA and likely to delay close.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Long-hour anomalies</div><strong>{approvalSignals.overtimeRows.length}</strong><span>Day-level signals above 10 hours or week-level signals above 60 hours.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Missing timesheets</div><strong>{approvalSignals.missingTimesheets.length}</strong><span>Active people in queue scope with no submitted work in the current range.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Missing notes</div><strong>{approvalSignals.missingNotesCount}</strong><span>Queued groups with at least one line that has no manager-facing note.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Payroll blockers</div><strong>{approvalSignals.blockerCount + exceptionSummary.locked}</strong><span>Stale rows, anomaly rows, missing timesheets, plus locked periods visible in queue.</span></div>
+      </div>
+
+      <div className="card cardPad" style={{ marginBottom: 14 }}>
+        <div className="setuCardHeaderRow" style={{ marginBottom: 12 }}>
+          <div>
+            <div className="setuSectionTitle" style={{ fontSize: 18 }}>Approval review priorities</div>
+            <div className="setuSectionHint">Use the queue like an exception workspace: clear stale items first, then anomalies, then missing context.</div>
+          </div>
+        </div>
+        <div className="setuFocusList">
+          <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=stale'}><span>Clear stale items</span><strong>{approvalSignals.staleRows.length}</strong></button>
+          <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=overtime'}><span>Review anomaly days</span><strong>{approvalSignals.overtimeRows.length}</strong></button>
+          <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=all'}><span>Request missing timesheets</span><strong>{approvalSignals.missingTimesheets.length}</strong></button>
+          <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=locked'}><span>Watch locked ranges</span><strong>{exceptionSummary.locked}</strong></button>
+        </div>
       </div>
 
       {msg ? (
@@ -631,6 +685,7 @@ useEffect(() => {
             const total = groupTotalHours(g);
             const isOpen = !!expanded[g.key];
             const days = groupDaysSummary(g);
+            const flags = groupFlags(g);
 
             return (
               <section key={g.key} className="card cardPad apGroupCard">
@@ -638,9 +693,13 @@ useEffect(() => {
                   <div>
                     <div className="apGroupTitle">{displayName(g.user_id, sample)}</div>
                     <div className="muted apGroupMeta">
-                      <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <span>Week: {g.week_start} → {g.week_end} • {g.entries.length} entries</span>
                         {isLocked ? <span className="badge badgeLocked">Locked</span> : <span className="badge">Open</span>}
+                        {flags.stale ? <span className="pill warn">Stale</span> : null}
+                        {flags.overtime ? <span className="pill warn">Long hours</span> : null}
+                        {flags.missingNotes > 0 ? <span className="pill">{flags.missingNotes} no-note</span> : null}
+                        {!isLocked && (flags.stale || flags.overtime) ? <span className="pill">Needs review first</span> : null}
                       </span>
                     </div>
 
