@@ -611,6 +611,22 @@ useEffect(() => {
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=stale'}><span>Stale approvals</span><strong>{exceptionSummary.stale}</strong></button>
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=overtime'}><span>Overtime signals</span><strong>{exceptionSummary.overtime}</strong></button>
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=locked'}><span>Locked visible</span><strong>{exceptionSummary.locked}</strong></button>
+        <button className="setuFocusItem" onClick={() => window.location.href = '/admin/notifications'}><span>Notifications</span><strong>Open</strong></button>
+      </div>
+
+      <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Manager queue</div><strong>{queueSummary.totalGroups}</strong><span>Grouped approvals by person and week for faster exception handling.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Long-hour alerts</div><strong>{exceptionSummary.overtime}</strong><span>Entries above 10 hours in a day or 60 hours in a week.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Missing timesheets</div><strong>{exceptionSummary.missingTimesheets}</strong><span>People assigned to the queue scope with no submission yet.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Payroll blockers</div><strong>{exceptionSummary.stale + exceptionSummary.locked}</strong><span>Locked periods plus stale approvals that could delay payroll close.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Reminder readiness</div><strong>{exceptionSummary.missingTimesheets + exceptionSummary.stale}</strong><span>Contractors missing submissions plus stale groups are ready for notification workflows.</span></div>
+      </div>
+
+      <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Manager queue</div><strong>{queueSummary.totalGroups}</strong><span>Grouped approvals by person and week for faster exception handling.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Long-hour alerts</div><strong>{exceptionSummary.overtime}</strong><span>Entries above 10 hours in a day or 60 hours in a week.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Missing timesheets</div><strong>{exceptionSummary.missingTimesheets}</strong><span>People assigned to the queue scope with no submission yet.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Payroll blockers</div><strong>{exceptionSummary.stale + exceptionSummary.locked}</strong><span>Locked periods plus stale approvals that could delay payroll close.</span></div>
       </div>
 
       <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
