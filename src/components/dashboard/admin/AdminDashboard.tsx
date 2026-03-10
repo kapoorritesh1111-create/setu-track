@@ -368,6 +368,14 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
     { label: "Operations signals", value: String(insights.opsAlerts), hint: `${insights.staleApprovals} stale • ${insights.overtimeDays} overtime day alerts` },
   ];
 
+  const notifications = buildOpsNotifications({
+    contractors,
+    rows,
+    budgets: projectBudgets,
+    periodLocked,
+    exportsCount: events.length,
+  });
+
   if (!busy && rows.length === 0 && !message) {
     return (
       <div className="setuDashboardWrap">
@@ -424,6 +432,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
           <div className="setuHeaderActions">
             <button className="pill" onClick={() => router.push(`/analytics?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`)}>Analytics</button>
             <button className="pill" onClick={() => router.push(`/approvals?scope=all`)}>Review approvals</button>
+            <button className="pill" onClick={() => router.push(`/admin/notifications?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`)}>Notifications</button>
             <button className="btnPrimary" onClick={() => router.push(`/reports/payroll?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`)}>Open payroll report</button>
           </div>
         </div>
@@ -630,6 +639,34 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
       </div>
 
       <div className="setuCommandGrid setuCommandGridBottom">
+        <section className="setuSurfaceCard">
+          <div className="setuSectionLead">
+            <div>
+              <div className="setuSectionTitle">Action center</div>
+              <div className="setuSectionHint">Use this priority queue to trigger reminders, clear blockers, and complete finance handoff.</div>
+            </div>
+            <button className="pill" onClick={() => router.push(`/admin/notifications?preset=${encodeURIComponent(preset)}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`)}>Open notifications</button>
+          </div>
+          <div className="setuNotificationList">
+            {notifications.slice(0, 5).map((item) => (
+              <button key={item.id} className={`setuNotificationItem severity-${item.severity}`} onClick={() => router.push(item.href)}>
+                <div style={{ display: "grid", gap: 6, flex: 1, minWidth: 0 }}>
+                  <div className="setuNotificationHead">
+                    <span className="setuNotificationTitle">{item.title}</span>
+                    <span className={`setuNotificationBadge severity-${item.severity}`}>{severityLabel(item.severity)}</span>
+                  </div>
+                  <div className="setuProjectMeta">{item.body}</div>
+                </div>
+                <div className="setuNotificationMeta">
+                  <strong>{item.metric}</strong>
+                  <span>Open →</span>
+                </div>
+              </button>
+            ))}
+            {!notifications.length ? <div className="muted">No active operational alerts for this period.</div> : null}
+          </div>
+        </section>
+
         <section className="setuSurfaceCard">
           <div className="setuSectionLead">
             <div>
