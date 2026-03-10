@@ -1641,3 +1641,65 @@ textarea.nativeControl {
   .tsSummaryBarRow,
   .setuMetricGrid { grid-template-columns: 1fr; }
 }
+
+/* Phase 3A shared signal cards */
+.setuSignalGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.setuSignalCard {
+  background: var(--setu-surface);
+  border: 1px solid var(--setu-border);
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgba(15,26,46,0.05);
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+}
+.setuSignalLabel {
+  color: var(--setu-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.setuSignalCard strong {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--setu-indigo-900);
+}
+.setuSignalCard span {
+  color: var(--setu-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+html[data-theme="dark"] body {
+  background: linear-gradient(180deg, #081327 0%, var(--setu-bg) 160px, var(--setu-bg) 100%);
+}
+html[data-theme="dark"] .pageHeader,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .setuSurfaceCard,
+html[data-theme="dark"] .setuMetricCard,
+html[data-theme="dark"] .setuSignalCard,
+html[data-theme="dark"] .setuFilterBar,
+html[data-theme="dark"] .setuHeroCard,
+html[data-theme="dark"] .setuChartCard,
+html[data-theme="dark"] .setuMainCard,
+html[data-theme="dark"] .setuSideCard,
+html[data-theme="dark"] .analyticsPanel {
+  background: rgba(12, 33, 71, 0.94);
+}
+html[data-theme="dark"] .table th {
+  background: rgba(255,255,255,0.04);
+}
+html[data-theme="dark"] .pill.ok { color: #bbf7d0; }
+html[data-theme="dark"] .pill.warn { color: #fde68a; }
+
+@media (max-width: 1180px) {
+  .setuSignalGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .setuSignalGrid { grid-template-columns: 1fr; }
+}
