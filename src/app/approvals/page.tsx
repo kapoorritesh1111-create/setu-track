@@ -358,6 +358,14 @@ function ApprovalsInner() {
     return { stale, missingTimesheets, overtime, locked };
   }, [groups, profiles, lockByRange]);
 
+
+  function groupFlags(group: Group) {
+    const stale = ((Date.now() - new Date(`${group.week_end}T00:00:00`).getTime()) / 86400000) > 2;
+    const overtime = groupTotalHours(group) > 60 || groupDaysSummary(group).some(([, hours]) => hours > 10);
+    const missingNotes = group.entries.filter((entry) => !String(entry.notes || "").trim()).length;
+    return { stale, overtime, missingNotes };
+  }
+
   const visibleGroups = useMemo(() => {
     if (scope === "stale") return groups.filter((group) => ((Date.now() - new Date(`${group.week_end}T00:00:00`).getTime()) / 86400000) > 2);
     if (scope === "overtime") return groups.filter((group) => groupTotalHours(group) > 60 || groupDaysSummary(group).some(([, hours]) => hours > 10));
@@ -605,6 +613,13 @@ useEffect(() => {
         <button className="setuFocusItem" onClick={() => window.location.href = '/approvals?scope=locked'}><span>Locked visible</span><strong>{exceptionSummary.locked}</strong></button>
       </div>
 
+      <div className="setuSignalGrid" style={{ marginBottom: 14 }}>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Manager queue</div><strong>{queueSummary.totalGroups}</strong><span>Grouped approvals by person and week for faster exception handling.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Long-hour alerts</div><strong>{exceptionSummary.overtime}</strong><span>Entries above 10 hours in a day or 60 hours in a week.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Missing timesheets</div><strong>{exceptionSummary.missingTimesheets}</strong><span>People assigned to the queue scope with no submission yet.</span></div>
+        <div className="setuSignalCard"><div className="setuSignalLabel">Payroll blockers</div><strong>{exceptionSummary.stale + exceptionSummary.locked}</strong><span>Locked periods plus stale approvals that could delay payroll close.</span></div>
+      </div>
+
       {msg ? (
         <div className="alert alertInfo">
           <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg}</pre>
@@ -631,6 +646,7 @@ useEffect(() => {
             const total = groupTotalHours(g);
             const isOpen = !!expanded[g.key];
             const days = groupDaysSummary(g);
+            const flags = groupFlags(g);
 
             return (
               <section key={g.key} className="card cardPad apGroupCard">
@@ -638,9 +654,12 @@ useEffect(() => {
                   <div>
                     <div className="apGroupTitle">{displayName(g.user_id, sample)}</div>
                     <div className="muted apGroupMeta">
-                      <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <span>Week: {g.week_start} → {g.week_end} • {g.entries.length} entries</span>
                         {isLocked ? <span className="badge badgeLocked">Locked</span> : <span className="badge">Open</span>}
+                        {flags.stale ? <span className="pill warn">Stale</span> : null}
+                        {flags.overtime ? <span className="pill warn">Long hours</span> : null}
+                        {flags.missingNotes > 0 ? <span className="pill">{flags.missingNotes} no-note</span> : null}
                       </span>
                     </div>
 

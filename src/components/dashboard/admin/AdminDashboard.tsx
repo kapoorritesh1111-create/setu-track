@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseBrowser";
 import { apiJson } from "../../../lib/api/client";
 import { presetLabel, presetToRange, previousRangeFor, type DatePreset } from "../../../lib/dateRanges";
+import { formatDateRange, formatDateTime, formatMoney } from "../../../lib/format";
 import DateRangeToolbar from "../../ui/DateRangeToolbar";
 import { EmptyState } from "../../ui/EmptyState";
 import { StatusChip } from "../../ui/StatusChip";
@@ -62,18 +63,10 @@ type ProjectBudgetLite = {
   budget_currency: string | null;
 };
 
-function money(x: number, currency = "USD") {
-  return `${currency} ${x.toFixed(2)}`;
-}
-
 function pctChange(current: number, previous: number) {
   if (!previous && !current) return 0;
   if (!previous) return 100;
   return ((current - previous) / previous) * 100;
-}
-
-function rangeLabel(start: string, end: string) {
-  return `${new Date(`${start}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} → ${new Date(`${end}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
 export default function AdminDashboard({ orgId }: { orgId: string; userId: string }) {
@@ -269,7 +262,9 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
     }
     const overtimeDays = Array.from(dailyByUser.values()).filter((hours) => hours > 10).length;
     const opsAlerts = overBudgetProjects + nearBudgetProjects + missingSubmissions + staleApprovals + peopleNeedingRates + overtimeDays;
-
+    const highestProjectCost = Math.max(1, ...Array.from(projectMap.values()).map((project) => project.cost));
+    const budgetCoveragePct = totalBudgetAmount > 0 ? Math.min(999, (currentPayroll / totalBudgetAmount) * 100) : 0;
+    const readinessLabel = periodLocked ? "Locked" : pendingApprovals === 0 ? "Ready" : "Attention";
 
     const contractorCostMap = new Map<string, { id: string; name: string; hours: number; cost: number }>();
     for (const row of rows) {
@@ -281,9 +276,9 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
     }
     const topContractors = Array.from(contractorCostMap.values()).sort((a, b) => b.cost - a.cost).slice(0, 5);
     const monthlyTrend = [
-      { label: "Prior payroll", value: previousPayroll, hint: rangeLabel(previousRange.start, previousRange.end) },
-      { label: "Approved payroll", value: currentPayroll, hint: rangeLabel(startDate, endDate) },
-      { label: "Forecast payroll", value: projectedPayroll, hint: `${money(pendingForecast)} pending` },
+      { label: "Prior payroll", value: previousPayroll, hint: formatDateRange(previousRange.start, previousRange.end) },
+      { label: "Approved payroll", value: currentPayroll, hint: formatDateRange(startDate, endDate) },
+      { label: "Forecast payroll", value: projectedPayroll, hint: `${formatMoney(pendingForecast)} pending` },
     ];
     return {
       totalHours,
@@ -309,10 +304,13 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
       staleApprovals,
       overtimeDays,
       opsAlerts,
+      highestProjectCost,
+      budgetCoveragePct,
+      readinessLabel,
       topContractors,
       monthlyTrend,
     };
-  }, [rows, previousRows, contractors, summary, previousSummary, projectBudgets]);
+  }, [rows, previousRows, contractors, summary, previousSummary, projectBudgets, periodLocked, previousRange.start, previousRange.end, startDate, endDate]);
 
   async function previewClose() {
     try {
@@ -354,8 +352,8 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
   const metrics = [
     { label: "Active contractors", value: String(Number(summary?.active_contractors ?? contractors.length)), hint: `${insights.missingSubmissions} missing submissions` },
     { label: "Hours this period", value: insights.totalHours.toFixed(2), hint: `${insights.hoursChange >= 0 ? "+" : ""}${insights.hoursChange.toFixed(1)}% vs prior range` },
-    { label: "Payroll this period", value: money(insights.currentPayroll), hint: `${insights.payrollChange >= 0 ? "+" : ""}${insights.payrollChange.toFixed(1)}% vs prior range` },
-    { label: "Forecast payroll", value: money(insights.projectedPayroll), hint: `${money(insights.pendingForecast)} still pending approvals` },
+    { label: "Payroll this period", value: formatMoney(insights.currentPayroll), hint: `${insights.payrollChange >= 0 ? "+" : ""}${insights.payrollChange.toFixed(1)}% vs prior range` },
+    { label: "Forecast payroll", value: formatMoney(insights.projectedPayroll), hint: `${formatMoney(insights.pendingForecast)} still pending approvals` },
     { label: "Pending approvals", value: String(insights.pendingApprovals), hint: `${insights.submittedHours.toFixed(2)} hrs awaiting review` },
     { label: "Budget alerts", value: String(insights.overBudgetProjects), hint: `${insights.nearBudgetProjects} near budget • ${insights.noBudgetProjects} without budget` },
     { label: "Operations signals", value: String(insights.opsAlerts), hint: `${insights.staleApprovals} stale • ${insights.overtimeDays} overtime day alerts` },
@@ -433,10 +431,33 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
       </div>
 
       <div className="setuTrendSummary">
-        <div className="setuMetricCard"><div className="setuMetricLabel">Approved payroll</div><div className="setuMetricValue">{money(insights.currentPayroll)}</div><div className="setuMetricHint">Locked to approved work in the selected range.</div></div>
-        <div className="setuMetricCard"><div className="setuMetricLabel">Pending payroll</div><div className="setuMetricValue">{money(insights.pendingForecast)}</div><div className="setuMetricHint">Submitted work that still needs approval.</div></div>
+        <div className="setuMetricCard"><div className="setuMetricLabel">Approved payroll</div><div className="setuMetricValue">{formatMoney(insights.currentPayroll)}</div><div className="setuMetricHint">Locked to approved work in the selected range.</div></div>
+        <div className="setuMetricCard"><div className="setuMetricLabel">Pending payroll</div><div className="setuMetricValue">{formatMoney(insights.pendingForecast)}</div><div className="setuMetricHint">Submitted work that still needs approval.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Projects at risk</div><div className="setuMetricValue">{insights.overBudgetProjects + insights.nearBudgetProjects}</div><div className="setuMetricHint">{insights.overBudgetProjects} over budget • {insights.nearBudgetProjects} near budget.</div></div>
         <div className="setuMetricCard"><div className="setuMetricLabel">Operational integrity</div><div className="setuMetricValue">{insights.peopleNeedingRates + insights.staleApprovals + insights.overtimeDays}</div><div className="setuMetricHint">Missing rates, stale approvals, and overtime days.</div></div>
+      </div>
+
+      <div className="setuSignalGrid">
+        <div className="setuSignalCard">
+          <div className="setuSignalLabel">Approval backlog</div>
+          <strong>{insights.pendingApprovals}</strong>
+          <span>{insights.submittedHours.toFixed(2)} hours are still waiting for signoff.</span>
+        </div>
+        <div className="setuSignalCard">
+          <div className="setuSignalLabel">Missing timesheets</div>
+          <strong>{insights.missingSubmissions}</strong>
+          <span>Active contractors with no entries in {presetLabel(preset, startDate, endDate).toLowerCase()}.</span>
+        </div>
+        <div className="setuSignalCard">
+          <div className="setuSignalLabel">Rate coverage</div>
+          <strong>{insights.peopleNeedingRates}</strong>
+          <span>Contractors still missing an hourly rate snapshot or default rate.</span>
+        </div>
+        <div className="setuSignalCard">
+          <div className="setuSignalLabel">Budget coverage</div>
+          <strong>{insights.totalBudgetAmount > 0 ? `${Math.min(999, insights.budgetCoveragePct).toFixed(0)}%` : '—'}</strong>
+          <span>{insights.totalBudgetAmount > 0 ? `${formatMoney(insights.currentPayroll)} against ${formatMoney(insights.totalBudgetAmount)}` : 'Add project budgets to unlock burn tracking.'}</span>
+        </div>
       </div>
 
       <div className="setuCommandGrid">
@@ -452,8 +473,8 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
             <div className="setuReadinessRow"><span>Approved hours</span><strong>{insights.approvedHours.toFixed(2)}</strong></div>
             <div className="setuReadinessRow"><span>Awaiting approvals</span><strong>{insights.submittedHours.toFixed(2)} hrs</strong></div>
             <div className="setuReadinessRow"><span>Last payroll state</span><strong>{summary?.payroll_state || "open"}</strong></div>
-            <div className="setuReadinessRow"><span>Current range</span><strong>{rangeLabel(startDate, endDate)}</strong></div>
-            {lockedAt ? <div className="setuReadinessRow"><span>Locked at</span><strong>{new Date(lockedAt).toLocaleString()}</strong></div> : null}
+            <div className="setuReadinessRow"><span>Current range</span><strong>{formatDateRange(startDate, endDate)}</strong></div>
+            {lockedAt ? <div className="setuReadinessRow"><span>Locked at</span><strong>{formatDateTime(lockedAt)}</strong></div> : null}
           </div>
           <div className="setuActionRow">
             <button className="pill" onClick={previewClose} disabled={previewBusy}>{previewBusy ? "Checking…" : "Preview close"}</button>
@@ -499,18 +520,18 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
             </div>
           </div>
           <div className="setuTrendSummary">
-            <div className="setuTrendCard"><span>Current payroll</span><strong>{money(insights.currentPayroll)}</strong></div>
-            <div className="setuTrendCard"><span>Prior payroll</span><strong>{money(insights.previousPayroll)}</strong></div>
+            <div className="setuTrendCard"><span>Current payroll</span><strong>{formatMoney(insights.currentPayroll)}</strong></div>
+            <div className="setuTrendCard"><span>Prior payroll</span><strong>{formatMoney(insights.previousPayroll)}</strong></div>
             <div className="setuTrendCard"><span>Payroll variance</span><strong className={insights.payrollChange >= 0 ? "isPositive" : "isNegative"}>{insights.payrollChange >= 0 ? "+" : ""}{insights.payrollChange.toFixed(1)}%</strong></div>
             <div className="setuTrendCard"><span>Approval coverage</span><strong>{insights.approvalsReadyPct.toFixed(0)}%</strong></div>
-            <div className="setuTrendCard"><span>Budget capacity</span><strong>{insights.totalBudgetAmount > 0 ? money(insights.totalBudgetAmount) : "—"}</strong></div>
+            <div className="setuTrendCard"><span>Budget capacity</span><strong>{insights.totalBudgetAmount > 0 ? formatMoney(insights.totalBudgetAmount) : "—"}</strong></div>
           </div>
           <div className="setuBarsList">
             {insights.topProjects.map((project) => {
               const width = insights.topProjects[0]?.cost ? Math.max(8, (project.cost / insights.topProjects[0].cost) * 100) : 8;
               return (
                 <div className="setuBarBlock" key={project.id}>
-                  <div className="setuBarHead"><span>{project.name}</span><span>{money(project.cost)} • {project.hours.toFixed(2)} hrs</span></div>
+                  <div className="setuBarHead"><span>{project.name}</span><span>{formatMoney(project.cost)} • {project.hours.toFixed(2)} hrs</span></div>
                   <div className="setuBarTrack"><div className="setuBarFill" style={{ width: `${width}%` }} /></div>
                 </div>
               );
@@ -529,13 +550,17 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
           <div className="setuProjectList">
             {insights.topProjects.map((project) => (
               <button className="setuProjectItem" key={project.id} onClick={() => router.push(`/reports/payroll?project_id=${encodeURIComponent(project.id)}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`)}>
-                <div>
-                  <div className="setuProjectName">{project.name}</div>
-                  <div className="setuProjectMeta">{project.peopleCount} contractors • {project.pending} pending items • {project.health === "over" ? "Over budget" : project.health === "near" ? "Near budget" : project.health === "within" ? "Within budget" : "No budget"}</div>
+                <div style={{ display: "grid", gap: 8, flex: 1, minWidth: 0 }}>
+                  <div>
+                    <div className="setuProjectName">{project.name}</div>
+                    <div className="setuProjectMeta">{project.peopleCount} contractors • {project.pending} pending items • {project.health === "over" ? "Over budget" : project.health === "near" ? "Near budget" : project.health === "within" ? "Within budget" : "No budget"}</div>
+                  </div>
+                  <div className="setuBarTrack"><div className="setuBarFill" style={{ width: `${Math.max(8, (project.cost / Math.max(insights.highestProjectCost, 1)) * 100)}%` }} /></div>
+                  <div className="setuProjectMeta">{project.budgetAmount > 0 ? `${Math.min(999, (project.cost / Math.max(project.budgetAmount, 1)) * 100).toFixed(0)}% of budget used` : `${project.hours.toFixed(2)} hours logged`}</div>
                 </div>
                 <div className="setuProjectRight">
-                  <div>{money(project.cost, project.currency)}</div>
-                  <div className="muted">{project.budgetAmount > 0 ? `${money(project.budgetAmount, project.currency)} budget` : `${project.hours.toFixed(2)} hrs`}</div>
+                  <div>{formatMoney(project.cost, project.currency)}</div>
+                  <div className="muted">{project.budgetAmount > 0 ? `${formatMoney(project.budgetAmount, project.currency)} budget` : `${project.hours.toFixed(2)} hrs`}</div>
                 </div>
               </button>
             ))}
@@ -556,7 +581,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
               const width = insights.topContractors[0]?.cost ? Math.max(8, (person.cost / insights.topContractors[0].cost) * 100) : 8;
               return (
                 <div className="setuBarBlock" key={person.id}>
-                  <div className="setuBarHead"><span>{person.name}</span><span>{money(person.cost)} • {person.hours.toFixed(2)} hrs</span></div>
+                  <div className="setuBarHead"><span>{person.name}</span><span>{formatMoney(person.cost)} • {person.hours.toFixed(2)} hrs</span></div>
                   <div className="setuBarTrack"><div className="setuBarFill" style={{ width: `${width}%` }} /></div>
                 </div>
               );
@@ -578,7 +603,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
               const width = Math.max(8, (Number(item.value || 0) / max) * 100);
               return (
                 <div className="setuBarBlock" key={item.label}>
-                  <div className="setuBarHead"><span>{item.label}</span><span>{money(Number(item.value || 0))}</span></div>
+                  <div className="setuBarHead"><span>{item.label}</span><span>{formatMoney(Number(item.value || 0))}</span></div>
                   <div className="setuBarTrack"><div className="setuBarFill" style={{ width: `${width}%` }} /></div>
                   <div className="setuProjectMeta">{item.hint}</div>
                 </div>
@@ -603,7 +628,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
                   <div className="setuActivityTitle">{event.export_type || "Export generated"}</div>
                   <div className="setuActivityMeta">{event.actor_name_snapshot || "SETU TRACK"} • {event.file_format || "file"}</div>
                 </div>
-                <div className="muted">{new Date(event.created_at).toLocaleString()}</div>
+                <div className="muted">{formatDateTime(event.created_at)}</div>
               </div>
             )) : (
               <div className="muted">No export activity in this period yet.</div>
@@ -626,7 +651,7 @@ export default function AdminDashboard({ orgId }: { orgId: string; userId: strin
                   <div className="setuActivityTitle">{run.period_start} → {run.period_end}</div>
                   <div className="setuActivityMeta">{run.status || "open"} • {Number(run.total_hours || 0).toFixed(2)} hrs</div>
                 </div>
-                <div>{money(Number(run.total_amount || 0))}</div>
+                <div>{formatMoney(Number(run.total_amount || 0))}</div>
               </div>
             ))}
           </div>
