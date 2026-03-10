@@ -536,7 +536,7 @@ textarea.nativeControl {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(250px, .7fr);
   gap: 18px;
-  align-items: end;
+  align-items: flex-end;
 }
 .tsCommandEyebrow {
   display: inline-flex;
